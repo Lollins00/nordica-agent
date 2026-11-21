@@ -18,7 +18,7 @@ del dello della dei degli delle al allo alla ai agli alle dal dallo dalla dai da
 nelle sul sullo sulla sui sugli sulle quale quali quanto quanta quanti quante come dove quando perche cosa cose
 sono era siamo essere stato stata ho hai ha abbiamo hanno mi ti ci vi mio tuo suo nostro loro questo questa questi
 queste quello quella fare fatto puoi puo dimmi dammi sai vorrei voglio dire sapere esiste c'e ce piu molto anche
-gia ancora oggi ora poi se ne lo""".split())
+gia ancora oggi ora poi se ne lo qual dell dall nell sull quell all coll vorrebbe devo deve puoi dimmi mostra mostrami elenca vedere sapere dovrei""".split())
 
 LOW = {"acme", "nordica", "logistica", "progetto", "azienda", "team", "release", "tracker"}
 
@@ -46,15 +46,20 @@ def stems(text: str) -> list[str]:
     return out
 
 
+_LOW_STEMS = {w[:5] for w in LOW}
+
+
 def score(question_stems: set[str], fact: dict) -> float:
+    """Punteggio lessicale. Le parole generiche (Acme, progetto...) e i numeri pesano poco e da soli non bastano;
+    inoltre almeno il 60% dei termini 'forti' della domanda deve comparire nel fatto, altrimenti è un'altra domanda
+    (es. «budget marketing» non deve pescare il budget assunzioni)."""
     fstems = set(stems(fact["statement"])) | set(stems(" ".join(fact["topics"])))
     hit = question_stems & fstems
-    if not hit:
+    q_strong = {q for q in question_stems if not q.isdigit() and q not in _LOW_STEMS}
+    h_strong = hit & q_strong
+    if not h_strong or len(h_strong) / len(q_strong) < 0.6:
         return 0.0
-    strong = [h for h in hit if not h.isdigit() and h not in {s[:5] for s in LOW}]
-    if not strong:                      # solo parole generiche (es. "Acme") o numeri: non basta
-        return 0.0
-    return sum(0.5 if (h.isdigit() or h in {s[:5] for s in LOW}) else 1.0 for h in hit)
+    return sum(0.5 if (h.isdigit() or h in _LOW_STEMS) else 1.0 for h in hit)
 
 
 THRESHOLD = 1.0
