@@ -126,8 +126,28 @@ def rule_absences(role: str) -> list[dict]:
     return out
 
 
+def rule_inbox(role: str) -> list[dict]:
+    """Email esterne smistate a questo settore con bozza ancora in attesa."""
+    out = []
+    st = store.get()
+    for m in st["inbox"]:
+        if role != "ceo" and m["routed_role"] != role:
+            continue
+        o = m["outcome"]
+        act = next((a for a in st["actions"] if a["id"] == o.get("action_id")), None)
+        if act and act["status"] != "pending":
+            continue
+        src = data.all_sources().get(m["source_id"])
+        out.append({"id": f"inbox:{m['id']}", "rule": "inbox", "severity": "med",
+                    "title": f"Nuova richiesta in ingresso: {m['subject'] or 'senza oggetto'}",
+                    "detail": f"{m['from']} ha scritto «{m['subject']}»: {o['summary']} Smistata al settore {o['sector']}; "
+                              f"la bozza di risposta è in attesa tra le Azioni.",
+                    "sources": [data.source_ref(src)] if src else [], "action": None, "_sort": -3})
+    return out
+
+
 def compute_alerts(role: str) -> list[dict]:
-    alerts = rule_conflicts(role) + rule_absences(role) + rule_unanswered(role) + rule_deadlines(role)
+    alerts = rule_conflicts(role) + rule_absences(role) + rule_inbox(role) + rule_unanswered(role) + rule_deadlines(role)
     alerts.sort(key=lambda a: (SEV_ORDER[a["severity"]], a["_sort"]))
     for a in alerts:
         a.pop("_sort", None)

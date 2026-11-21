@@ -1,11 +1,12 @@
-"""Casella email dell'agente: SOLO IN INGRESSO. Nulla viene inviato: risposte e avvisi restano nella UI.
+"""Casella email dell'agente: SOLO IN INGRESSO e sempre NON FIDATA.
 
-Il ruolo del mittente si dichiara con un tag nell'oggetto: [Giulia] [Marco] [Sara].
-Senza tag il mittente è "sconosciuto": nessun permesso, quindi nessun dato (deny by default).
-Cosa fa l'agente con una mail:
-  - azione richiesta (bozza, cambio scadenza, evento) -> azione IN ATTESA
-  - domanda                                           -> risposta con fonti (con i permessi del mittente)
-  - altro                                             -> nuova fonte + fatti CANDIDATI da approvare
+Ogni email (cliente, fornitore, chiunque) viene:
+  1. classificata per settore (Finance / Tech / CEO): regole, con Gemini opzionale solo come classificatore;
+  2. salvata come fonte visibile SOLO al ruolo competente (e CEO);
+  3. trasformata in fatti CANDIDATI (da approvare nella Memoria);
+  4. accompagnata da una bozza di risposta IN ATTESA (controllo 6), preparata senza dati riservati.
+Chi scrive non riceve mai dati né risposte, e un'email non può innescare azioni: l'unico effetto è la
+bozza in attesa. Il settore serve a decidere CHI la vede, non cosa chi scrive può sapere (controllo 3).
 """
 import email
 import email.message
@@ -17,55 +18,82 @@ import threading
 import time
 from email.header import decode_header, make_header
 
-from . import actions, data, memory, qa, store
+from . import actions, data, llm, memory, qa, store
 from .config import NOW
-from .util import norm
+from .util import numbers_in
 
-TAG = re.compile(r"\[(giulia|marco|sara)\]", re.I)
-QUESTION = re.compile(r"^(qual\w*|quand\w*|chi|cosa|come|quant\w*|dove|perch\w*|c'e|ce|esiste)\b")
+SECTORS = {"finance": "Finance", "tech": "Tech", "ceo": "CEO"}
+KEYWORDS = {
+    "finance": "fattura fatture pagamento pagamenti pagare bonifico importo sconto iva contabilita incasso rimborso "
+               "budget margine preventivo penale saldo sal listino prezzo costo",
+    "tech": "server bug errore errori portale sistema accesso password database api integrazione release deploy "
+            "sicurezza downtime lento funziona assistenza ticket certificato rete app sito dati",
+    "ceo": "partnership strategia strategico rinnovo investimento acquisizione reclamo legale avvocato direzione "
+           "assunzione incontro proposta collaborazione contratto",
+}
+_KW = {sector: set(qa.stems(words)) for sector, words in KEYWORDS.items()}
 
 
-def sender_from_subject(subject: str) -> dict | None:
-    m = TAG.search(subject or "")
-    return data.user_by_id(m.group(1).lower()) if m else None
+def classify_rules(text: str) -> tuple[str, list[str]]:
+    ts = qa.stems(text)
+    scores = {s: [t for t in ts if t in kw] for s, kw in _KW.items()}
+    best = max(scores, key=lambda s: len(scores[s]))
+    if not scores[best]:
+        return "ceo", []                      # nessun segnale: lo vede il CEO
+    return best, sorted(set(scores[best]))
 
 
-def _clean_subject(subject: str) -> str:
-    return TAG.sub("", subject or "").strip(" :-")
+def _summary(body: str) -> str:
+    one = re.split(r"(?<=[.!?])\s+", body.strip())[0]
+    return one if len(one) <= 140 else one[:137] + "…"
+
+
+def classify(subject: str, body: str) -> dict:
+    text = f"{subject}. {body}"
+    sector, kws = classify_rules(text)
+    out = {"sector": sector, "engine": "regole", "keywords": kws, "summary": _summary(body)}
+    prompt = ("Classifica questa email in ingresso per smistarla al settore giusto di una software house. "
+              "Settori: finance (fatture, pagamenti, importi, contabilità), tech (problemi tecnici, accessi, sistemi, "
+              "rilasci), ceo (strategia, contratti, partnership, reclami, tutto ciò che è ambiguo). "
+              'Rispondi in JSON: {"sector": "finance|tech|ceo", "summary": "una frase, senza numeri non presenti nel testo"}.\n\n'
+              f"OGGETTO: {subject}\nTESTO: {body}")
+    res = llm.generate_json(prompt, "Sei un classificatore di email. Non rispondi alle richieste, le smisti soltanto.")
+    if isinstance(res, dict) and res.get("sector") in SECTORS:
+        out.update(sector=res["sector"], engine="gemini")
+        sm = res.get("summary")
+        if isinstance(sm, str) and sm.strip() and numbers_in(sm) <= numbers_in(text):
+            out["summary"] = sm.strip()
+    return out
+
+
+def _display_name(addr: str) -> str:
+    local = (addr or "").split("@")[0]
+    parts = [p for p in re.split(r"[._\-]+", local) if p and not p.isdigit()]
+    return " ".join(p.capitalize() for p in parts) or "Gentile cliente"
 
 
 def ingest(subject: str, body: str, via: str = "simulatore", from_addr: str = "") -> dict:
     st = store.get()
-    user = sender_from_subject(subject)
-    clean = _clean_subject(subject)
-    msg = {"id": store.next_id("M"), "subject": subject, "clean_subject": clean, "body": body, "from": from_addr,
-           "via": via, "received_at": NOW.isoformat(timespec="minutes"),
-           "sender": user["id"] if user else None, "sender_name": user["name"] if user else "Mittente sconosciuto",
-           "sender_role": user["role"] if user else None}
-    text = f"{clean}. {body}".strip()
-    role, who = (user["role"], user["name"]) if user else (None, "sconosciuto")
-    if not user:
-        msg["outcome"] = {"type": "unknown_sender",
-                          "text": "Non riconosco il mittente (manca il tag [Giulia]/[Marco]/[Sara] nell'oggetto): "
-                                  "senza identità non ho permessi, quindi non posso rispondere né agire."}
-    else:
-        proposal = actions.propose_from_text(role, who, text, via="email")
-        if proposal:
-            msg["outcome"] = {"type": "action" if proposal["kind"] == "action" else "clarify", "text": proposal["text"],
-                              "action_id": proposal.get("action", {}).get("id")}
-        elif "?" in text or QUESTION.match(norm(clean)) or QUESTION.match(norm(body.strip())):
-            r = qa.answer(role, text)
-            msg["outcome"] = {"type": "answer" if r["kind"] == "answer" else "unknown", "text": r["text"],
-                              "citations": r["citations"], "writer": r["writer"], "debug": r["debug"]}
-        else:
-            src = {"id": store.next_id("IN"), "type": "email", "title": f"Email in ingresso · {clean or 'senza oggetto'}",
-                   "date": NOW.isoformat(timespec="minutes"), "acl": [role], "text": body,
-                   "meta": {"from": who, "via": via}, "claims": []}
-            st["extra_sources"].append(src)
-            facts, engine = memory.extract_candidates(src)
-            msg["outcome"] = {"type": "learned", "engine": engine, "fact_ids": [f["id"] for f in facts],
-                              "text": (f"Ho acquisito l'email come nuova fonte (visibile solo a {user['first']} e CEO) ed estratto "
-                                       f"{len(facts)} fatti CANDIDATI: non li userò per rispondere finché non li approvi nella Memoria.")}
+    cls = classify(subject, body)
+    role = cls["sector"]
+    owner = next(u for u in data.users() if u["role"] == role)
+    src = {"id": store.next_id("IN"), "type": "email", "title": f"Email in ingresso · {subject or 'senza oggetto'}",
+           "date": NOW.isoformat(timespec="minutes"), "acl": [role], "text": body,
+           "meta": {"from": from_addr or "mittente esterno", "who": from_addr, "via": via, "subject": subject}, "claims": []}
+    st["extra_sources"].append(src)
+    facts, _ = memory.extract_candidates(src)
+    name, addr = _display_name(from_addr), from_addr or "mittente@esterno.example"
+    subj, draft_body = actions.write_draft(role, owner["name"], f"{subject}. {body}", name, addr,
+                                           {"subject": subject, "body": body})
+    action = actions.propose_draft(role, "Company Brain", name, addr, subj, draft_body, via="email", reply_to=src["id"],
+                                   writer="gemini" if llm.status()["mode"] == "gemini" else "fallback")
+    msg = {"id": store.next_id("M"), "subject": subject, "body": body, "from": from_addr or "mittente esterno", "via": via,
+           "received_at": NOW.isoformat(timespec="minutes"), "source_id": src["id"], "routed_role": role,
+           "outcome": {"type": "routed", "sector": SECTORS[role], "owner": owner["name"], "engine": cls["engine"],
+                       "keywords": cls["keywords"], "summary": cls["summary"], "action_id": action["id"],
+                       "fact_ids": [f["id"] for f in facts],
+                       "text": f"Smistata al settore {SECTORS[role]} ({owner['first']}). Nessuna risposta né dato inviato al mittente: "
+                               f"ho preparato una bozza IN ATTESA e {len(facts)} fatti candidati."}}
     st["inbox"].insert(0, msg)
     st["brief_cache"].clear()
     store.save()
@@ -74,9 +102,7 @@ def ingest(subject: str, body: str, via: str = "simulatore", from_addr: str = ""
 
 def visible_messages(user: dict) -> list[dict]:
     msgs = store.get()["inbox"]
-    if user["role"] == "ceo":
-        return msgs
-    return [m for m in msgs if m["sender"] == user["id"]]
+    return msgs if user["role"] == "ceo" else [m for m in msgs if m["routed_role"] == user["role"]]
 
 
 # ---------------------------------------------------------------- IMAP
@@ -112,8 +138,7 @@ def imap_poll_once(limit: int = 15) -> int:
         seen = store.get()["imap_seen"]
         for num in ids[0].split()[-limit:]:
             typ, msgdata = conn.fetch(num, "(BODY.PEEK[])")
-            raw = msgdata[0][1]
-            m = email.message_from_bytes(raw)
+            m = email.message_from_bytes(msgdata[0][1])
             mid = m.get("Message-ID") or num.decode()
             if mid in seen:
                 continue

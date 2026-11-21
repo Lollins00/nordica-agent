@@ -1,10 +1,13 @@
-"""Company Brain – API FastAPI. Autenticazione solo dimostrativa: l'utente è scelto dal selettore della UI."""
-from fastapi import FastAPI, HTTPException
+"""Company Brain – API FastAPI. Identità e ruolo vengono dalla SESSIONE (login separati), mai dal client."""
+import threading
+
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import actions, brief, data, events, inbox, llm, memory, qa, store
+from . import actions, auth, brief, data, events, inbox, llm, memory, qa, store
+from .auth import current_user
 from .config import NOW, STATIC_DIR
 from .permissions import acl_label, can_see
 
@@ -13,27 +16,41 @@ app = FastAPI(title="Company Brain · Nordica")
 
 @app.on_event("startup")
 def _startup():
-    import threading
-    threading.Thread(target=lambda: llm.generate("Rispondi solo: ok", max_tokens=64), daemon=True).start()  # riscaldamento: scopre subito se Gemini risponde
+    # riscaldamento: scopre subito se Gemini risponde, così il primo brief non aspetta
+    threading.Thread(target=lambda: llm.generate("Rispondi solo: ok", max_tokens=64), daemon=True).start()
     inbox.start_background_poll()
 
 
-def U(uid: str) -> dict:
-    u = data.user_by_id(uid)
+# ------------------------------------------------------------------ login
+class LoginBody(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/login")
+def api_login(b: LoginBody, response: Response):
+    u = auth.verify(b.username, b.password)
     if not u:
-        raise HTTPException(404, "utente sconosciuto")
-    return u
+        raise HTTPException(401, "Credenziali non valide")
+    response.set_cookie(auth.COOKIE, auth.create_session(u["id"]), httponly=True, samesite="lax")
+    return auth.public(u)
+
+
+@app.post("/api/logout")
+def api_logout(request: Request, response: Response):
+    auth.drop_session(request.cookies.get(auth.COOKIE))
+    response.delete_cookie(auth.COOKIE)
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def api_me(user: dict = Depends(current_user)):
+    return auth.public(user)
 
 
 # ------------------------------------------------------------- generale
-@app.get("/api/users")
-def api_users():
-    return data.users()
-
-
 @app.get("/api/status")
-def api_status(user: str):
-    u = U(user)
+def api_status(u: dict = Depends(current_user)):
     return {"llm": llm.status(), "imap": inbox.imap_status(), "now": NOW.isoformat(timespec="minutes"),
             "badges": {"candidates": len(memory.facts_for(u["role"], "candidate")),
                        "pending": sum(1 for a in actions.visible_actions(u["role"]) if a["status"] == "pending" and u["role"] in a["approvers"])}}
@@ -44,39 +61,37 @@ class OfflineBody(BaseModel):
 
 
 @app.post("/api/llm/offline")
-def api_offline(b: OfflineBody):
+def api_offline(b: OfflineBody, u: dict = Depends(current_user)):
     llm.set_offline(b.offline)
     store.get()["brief_cache"].clear()
     return llm.status()
 
 
 @app.post("/api/reset")
-def api_reset():
+def api_reset(u: dict = Depends(current_user)):
     store.reset()
     return {"ok": True}
 
 
 # ---------------------------------------------------------------- brief
 @app.get("/api/brief")
-def api_brief(user: str):
-    return brief.build_brief(U(user))
+def api_brief(u: dict = Depends(current_user)):
+    return brief.build_brief(u)
 
 
 @app.post("/api/brief/refresh")
-def api_brief_refresh(user: str):
+def api_brief_refresh(u: dict = Depends(current_user)):
     store.get()["brief_cache"].clear()
-    return brief.build_brief(U(user))
+    return brief.build_brief(u)
 
 
 # ----------------------------------------------------------------- chat
 class AskBody(BaseModel):
-    user: str
     question: str
 
 
 @app.post("/api/ask")
-def api_ask(b: AskBody):
-    u = U(b.user)
+def api_ask(b: AskBody, u: dict = Depends(current_user)):
     q = b.question.strip()
     if not q:
         raise HTTPException(400, "domanda vuota")
@@ -88,19 +103,16 @@ def api_ask(b: AskBody):
 
 # --------------------------------------------------------------- memoria
 @app.get("/api/facts")
-def api_facts(user: str):
-    u = U(user)
+def api_facts(u: dict = Depends(current_user)):
     return memory.facts_for(u["role"])
 
 
 class StatusBody(BaseModel):
-    user: str
     status: str
 
 
 @app.post("/api/facts/{fid}/status")
-def api_fact_status(fid: str, b: StatusBody):
-    u = U(b.user)
+def api_fact_status(fid: str, b: StatusBody, u: dict = Depends(current_user)):
     try:
         return memory.set_status(fid, b.status, u["role"], u["name"])
     except LookupError:
@@ -111,19 +123,16 @@ def api_fact_status(fid: str, b: StatusBody):
 
 # ---------------------------------------------------------------- azioni
 @app.get("/api/actions")
-def api_actions(user: str):
-    u = U(user)
+def api_actions(u: dict = Depends(current_user)):
     return [{**a, "can_decide": u["role"] in a["approvers"]} for a in actions.visible_actions(u["role"])]
 
 
 class DecideBody(BaseModel):
-    user: str
     approve: bool
 
 
 @app.post("/api/actions/{aid}/decide")
-def api_decide(aid: str, b: DecideBody):
-    u = U(b.user)
+def api_decide(aid: str, b: DecideBody, u: dict = Depends(current_user)):
     try:
         return actions.decide(aid, u["role"], u["name"], b.approve)
     except LookupError:
@@ -135,14 +144,12 @@ def api_decide(aid: str, b: DecideBody):
 
 
 class ProposeBody(BaseModel):
-    user: str
     type: str
     args: dict
 
 
 @app.post("/api/actions/propose")
-def api_propose(b: ProposeBody):
-    u = U(b.user)
+def api_propose(b: ProposeBody, u: dict = Depends(current_user)):
     try:
         if b.type == "change_deadline":
             return actions.propose_deadline_change(u["role"], u["name"], b.args["task_id"], b.args["new_due"], via="brief")
@@ -155,16 +162,14 @@ def api_propose(b: ProposeBody):
     raise HTTPException(400, "tipo di azione non supportato")
 
 
-# ----------------------------------------------------------- Slack mock
+# --------------------------------------------------------------- canali
 @app.get("/api/channels")
-def api_channels(user: str):
-    u = U(user)
+def api_channels(u: dict = Depends(current_user)):
     return [c for c in data.channels() if can_see(u["role"], c["acl"])]
 
 
 @app.get("/api/channels/{cid}")
-def api_channel(cid: str, user: str):
-    u = U(user)
+def api_channel(cid: str, u: dict = Depends(current_user)):
     ch = next((c for c in data.channels() if c["id"] == cid and can_see(u["role"], c["acl"])), None)
     if not ch:
         raise HTTPException(404, "canale non trovato")
@@ -173,8 +178,7 @@ def api_channel(cid: str, user: str):
 
 
 @app.get("/api/source/{sid}")
-def api_source(sid: str, user: str):
-    u = U(user)
+def api_source(sid: str, u: dict = Depends(current_user)):
     s = data.all_sources().get(sid)
     if not s or not can_see(u["role"], s["acl"]):
         raise HTTPException(404, "fonte non trovata")      # identico se non esiste o non è visibile
@@ -183,12 +187,11 @@ def api_source(sid: str, user: str):
 
 # ------------------------------------------------------------ calendario
 @app.get("/api/calendar")
-def api_calendar(user: str):
-    return events.visible_events(U(user)["role"])
+def api_calendar(u: dict = Depends(current_user)):
+    return events.visible_events(u["role"])
 
 
 class EventBody(BaseModel):
-    user: str
     title: str
     start: str
     end: str | None = None
@@ -196,32 +199,32 @@ class EventBody(BaseModel):
 
 
 @app.post("/api/calendar")
-def api_add_event(b: EventBody):
-    u = U(b.user)
+def api_add_event(b: EventBody, u: dict = Depends(current_user)):
     try:
         return events.add_event(u["role"], u["name"], b.title, b.start, b.end, b.private)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
 
-# ------------------------------------------------------- inbox dell'agente
+# ------------------------------------------------------- casella dell'agente
 @app.get("/api/inbox")
-def api_inbox(user: str):
-    return inbox.visible_messages(U(user))
+def api_inbox(u: dict = Depends(current_user)):
+    return inbox.visible_messages(u)
 
 
 class InboundBody(BaseModel):
+    from_addr: str = ""
     subject: str
     body: str
 
 
 @app.post("/api/inbox/simulate")
-def api_simulate(b: InboundBody):
-    return inbox.ingest(b.subject, b.body, via="simulatore")
+def api_simulate(b: InboundBody, u: dict = Depends(current_user)):
+    return inbox.ingest(b.subject, b.body, via="simulatore", from_addr=b.from_addr.strip())
 
 
 @app.post("/api/inbox/poll")
-def api_poll():
+def api_poll(u: dict = Depends(current_user)):
     if not inbox.imap_configured():
         raise HTTPException(409, "IMAP non configurato (IMAP_USER / IMAP_PASSWORD nel .env)")
     try:

@@ -56,6 +56,10 @@ def score(question_stems: set[str], fact: dict) -> float:
     (es. «budget marketing» non deve pescare il budget assunzioni)."""
     fstems = set(stems(fact["statement"])) | set(stems(" ".join(fact["topics"])))
     hit = question_stems & fstems
+    # un numero identificativo nella domanda (es. «fattura 4521») deve comparire nel fatto: altrimenti è un'altra cosa
+    q_ids = {q for q in question_stems if q.isdigit() and len(q) >= 3 and not re.fullmatch(r"(19|20)\d\d", q)}
+    if q_ids and not q_ids <= fstems:
+        return 0.0
     q_strong = {q for q in question_stems if not q.isdigit() and q not in _LOW_STEMS}
     h_strong = hit & q_strong
     if not h_strong or len(h_strong) / len(q_strong) < 0.6:
