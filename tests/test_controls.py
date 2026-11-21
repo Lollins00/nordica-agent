@@ -409,3 +409,14 @@ def test_ids_are_not_reused_after_reset_so_stale_pages_cannot_hit_other_actions(
     ok = {"to": "a@azienda.it", "subject": "S", "body": "T"}
     assert as_("giulia").post(f"/api/actions/{first['id']}/edit", json=ok).status_code == 404   # la vecchia card non tocca la nuova bozza
     assert as_("giulia").post(f"/api/actions/{first['id']}/decide", json={"approve": True}).status_code == 404
+
+
+def test_2_demo_step_approve_one_reject_one_then_only_approved_answers():
+    """Il passo esatto del controllo 2: due candidati sulla penale, uno approvato e uno rifiutato dal vivo."""
+    q = "Qual è la penale per il ritardo?"
+    assert ask("giulia", q)["kind"] == "unknown"                                   # entrambi solo candidati
+    as_("giulia").post("/api/facts/F-ECON-PENALTY/status", json={"status": "approved"})
+    as_("giulia").post("/api/facts/F-FIN-PENALTY5/status", json={"status": "rejected"})
+    r = ask("giulia", q)
+    assert r["kind"] == "answer" and [c["fact_id"] for c in r["citations"]] == ["F-ECON-PENALTY"]
+    assert "1,5%" in r["text"] and "5% a settimana" not in r["text"].replace("1,5% a settimana", "")

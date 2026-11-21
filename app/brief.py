@@ -96,10 +96,6 @@ def rule_conflicts(role: str) -> list[dict]:
             if t and can_see(role, t["acl"]) and t["due"] != auth[0][0]:
                 action = {"type": "change_deadline", "label": f"Proponi di allineare {t['id']} al contratto ({fmt_short(auth[0][0])})",
                           "args": {"task_id": t["id"], "new_due": auth[0][0]}}
-        elif key == "acme.payment_terms":
-            em = next((e for e in data.emails() if e["id"] == "E-03" and can_see(role, e["acl"])), None)
-            if em:
-                action = {"type": "reply_email", "label": "Prepara bozza di risposta ad Acme", "args": {"email_id": "E-03"}}
         out.append({"id": f"conflict:{key}", "rule": "conflict", "severity": "high",
                     "title": f"Conflitto tra fonti: {meta['label']}",
                     "detail": f"Le fonti non concordano su «{meta['label']}»: " + " vs ".join(parts) + ".",

@@ -2,10 +2,5 @@
   {"id": "T-101", "title": "Consegna Release 2 Acme Tracker", "due": "2026-12-05", "status": "in_corso", "owner": "marco", "owner_name": "Marco", "acl": "all",
    "claims": [{"fact": "F-TASK-DELIV", "key": "acme.delivery_date", "value": "@due", "text": "Il task T-101 pianifica la consegna della Release 2 Acme per il {due}.", "topics": ["consegna", "release", "scadenza", "task", "data"], "init": "approved"}]},
   {"id": "T-102", "title": "Emettere fattura SAL2 Acme", "due": "2026-11-30", "status": "todo", "owner": "giulia", "owner_name": "Giulia", "acl": ["finance"], "claims": []},
-  {"id": "T-103", "title": "Pagare fattura hosting CloudNord", "due": "2026-11-28", "status": "todo", "owner": "giulia", "owner_name": "Giulia", "acl": ["finance"], "claims": []},
-  {"id": "T-104", "title": "Rinnovare certificato server di staging", "due": "2026-11-27", "status": "todo", "owner": "marco", "owner_name": "Marco", "acl": ["tech"], "claims": []},
-  {"id": "T-105", "title": "Preparare demo Release 2 per Acme", "due": "2026-11-25", "status": "todo", "owner": "marco", "owner_name": "Marco", "acl": "all", "claims": []},
-  {"id": "T-106", "title": "Revisione budget Q1 e piano assunzioni", "due": "2026-11-25", "status": "todo", "owner": "sara", "owner_name": "Sara", "acl": ["ceo"], "claims": []},
-  {"id": "T-107", "title": "Rifacimento modulo di geolocalizzazione", "due": "2026-12-04", "status": "in_corso", "owner": "marco", "owner_name": "Marco", "acl": ["tech"], "claims": []},
-  {"id": "T-099", "title": "Post-mortem incidente database del 12/11", "due": "2026-11-16", "status": "done", "owner": "marco", "owner_name": "Marco", "acl": ["tech"], "claims": []}
+  {"id": "T-103", "title": "Preparare demo Release 2 per Acme", "due": "2026-11-25", "status": "todo", "owner": "marco", "owner_name": "Marco", "acl": ["tech"], "claims": []}
 ]
