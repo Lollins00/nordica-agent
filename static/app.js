@@ -23,7 +23,7 @@ const TITLES = {
   actions: ['Azioni', 'Nulla accade finché una persona abilitata non approva'],
   calendar: ['Calendario', 'Eventi visibili al tuo ruolo'],
   inbox: ['Casella dell\'agente', 'Email in ingresso (sola lettura): il ruolo si dichiara nell\'oggetto, es. [Giulia]'],
-  slack: ['Slack', 'Mock dei canali: vedi solo quelli del tuo ruolo'],
+  slack: ['Slack', 'Vedi solo i canali del tuo ruolo'],
 };
 const SUGGESTIONS = ['Qual è il margine su Acme?', 'Qual è la causa dell\'incidente del 12/11?', 'Quando è la consegna della Release 2?',
   'Qual è la penale per il ritardo?', 'Quanto costa la mensa aziendale?', 'Sposta la scadenza della consegna Release 2 al 30/11',
@@ -372,7 +372,7 @@ async function renderSlack() {
   try { r = await api(`/api/channels/${encodeURIComponent(S.channel)}?${uq()}`); } catch (err) { log.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   const extra = (S.slack[S.user.id + ':' + S.channel] ||= []);
   const msg = m => `<div class="msg">${avatar(m.author)}<div class="body"><div class="who-line">${esc(m.author)}<span class="time">${esc(dmy(m.ts))} ${esc(hhmm(m.ts))}</span></div><div>${esc(m.text)}</div></div></div>`;
-  log.innerHTML = `<div class="hello"><b># ${esc(r.channel.name)}</b> ${r.channel.private ? '🔒 privato' : ''}<div class="meta">${esc(r.channel.topic)} — mock di Slack: i canali privati compaiono solo ai ruoli autorizzati. Scrivi <code>@brain</code> + domanda per interpellare il Brain.</div></div>
+  log.innerHTML = `<div class="hello"><b># ${esc(r.channel.name)}</b> ${r.channel.private ? '🔒 privato' : ''}<div class="meta">${esc(r.channel.topic)} · Scrivi <code>@brain</code> + domanda per interpellare il Brain.</div></div>
     ${r.messages.map(msg).join('')}${extra.join('')}`;
   $$('#slack-log .msg').forEach(still); $('#slack-scroll').scrollTop = 1e6;
 }
