@@ -1,1 +1,90 @@
-<html><body><div id="view-chat"></div><div id="view-email"></div><div id="view-slack"></div></body></html>
+<!doctype html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Company Brain · Nordica</title>
+<link rel="stylesheet" href="/static/app.css">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}</script>
+</head>
+<body>
+<div class="bg-orbs" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="ws">
+      <div class="ws-logo">N</div>
+      <div class="ws-name"><b>Nordica Srl</b><small>Company Brain</small></div>
+      <button id="theme-btn" class="icon-btn" title="Tema chiaro/scuro" aria-label="Cambia tema">🌙</button>
+    </div>
+
+    <div class="who">
+      <label class="sec-title">Stai usando come</label>
+      <div id="user-switch" class="user-switch"></div>
+    </div>
+
+    <nav class="nav">
+      <div class="sec-title">Company Brain</div>
+      <a class="nav-item" data-view="chat"><span class="ico">🧠</span>Chiedi al Brain</a>
+      <a class="nav-item" data-view="email"><span class="ico">☀️</span>Email del mattino</a>
+      <a class="nav-item" data-view="memory"><span class="ico">🧩</span>Memoria<b id="badge-memory" class="badge" hidden>0</b></a>
+      <a class="nav-item" data-view="actions"><span class="ico">⚡</span>Azioni<b id="badge-actions" class="badge pulse" hidden>0</b></a>
+      <a class="nav-item" data-view="calendar"><span class="ico">📅</span>Calendario</a>
+      <a class="nav-item" data-view="inbox"><span class="ico">📥</span>Casella agente</a>
+      <div class="sec-title">Canali (mock Slack)</div>
+      <div id="channel-list"></div>
+    </nav>
+
+    <div class="side-foot">
+      <div id="llm-pill" class="pill" title="Stato LLM"><i></i><span>…</span></div>
+      <label class="switch" title="Simula assenza di rete: il Brain continua a funzionare con il fallback deterministico">
+        <input id="offline-toggle" type="checkbox"><span>Simula offline</span>
+      </label>
+      <button id="reset-btn" class="ghost-btn">↺ Reset demo</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div><h1 id="view-title">Chiedi al Brain</h1><p id="view-sub"></p></div>
+      <div class="top-right"><span id="now-chip" class="chip-soft"></span></div>
+    </header>
+
+    <section id="view-chat" class="view">
+      <div id="chat-scroll" class="scroll"><div id="chat-log" class="chat-log"></div></div>
+      <div class="composer-wrap">
+        <div id="suggestions" class="suggestions"></div>
+        <form id="chat-form" class="composer">
+          <input id="chat-input" autocomplete="off" placeholder="Chiedi qualcosa al Brain, o chiedi di preparare un'azione…">
+          <button class="send" type="submit" aria-label="Invia">➤</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-email" class="view" hidden><div class="scroll"><div id="email-body" class="pad"></div></div></section>
+    <section id="view-memory" class="view" hidden><div class="scroll"><div id="memory-body" class="pad"></div></div></section>
+    <section id="view-actions" class="view" hidden><div class="scroll"><div id="actions-body" class="pad"></div></div></section>
+    <section id="view-calendar" class="view" hidden><div class="scroll"><div id="calendar-body" class="pad"></div></div></section>
+    <section id="view-inbox" class="view" hidden><div class="scroll"><div id="inbox-body" class="pad"></div></div></section>
+
+    <section id="view-slack" class="view" hidden>
+      <div id="slack-scroll" class="scroll"><div id="slack-log" class="chat-log slack"></div></div>
+      <div class="composer-wrap">
+        <form id="slack-form" class="composer">
+          <input id="slack-input" autocomplete="off" placeholder="Scrivi nel canale… usa @brain per chiedere qualcosa">
+          <button class="send" type="submit" aria-label="Invia">➤</button>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <button class="icon-btn modal-x" id="modal-x" aria-label="Chiudi">✕</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
