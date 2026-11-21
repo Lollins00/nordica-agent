@@ -23,7 +23,8 @@ const TITLES = {
   actions: ['Azioni', 'Nulla accade finché una persona abilitata non approva'],
   calendar: ['Calendario', 'Eventi visibili al tuo ruolo'],
   inbox: ['Casella dell\'agente', 'Email esterne smistate per settore: chi scrive non riceve mai dati'],
-  slack: ['Slack', 'Vedi solo i canali del tuo ruolo'],
+  slack: ['Canali', 'Vedi solo i canali del tuo ruolo'],
+  requests: ['Richieste', 'Ferie e richieste interne: decide la CEO, il Brain segnala i problemi'],
 };
 const SUGGESTIONS = ['Qual è il margine su Acme?', 'Qual è la causa dell\'incidente del 12/11?', 'Quando è la consegna della Release 2?',
   'Qual è la penale per il ritardo?', 'Quanto costa la mensa aziendale?', 'Sposta la scadenza della consegna Release 2 al 30/11',
@@ -206,7 +207,7 @@ function showLogin(msg) {
 
 async function logout() {
   try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { /* ok */ }
-  S.chat = {}; S.brief = {}; S.slack = {}; location.reload();
+  S.chat = {}; S.brief = {}; location.reload();
 }
 
 $('#pw-toggle').onclick = () => {
@@ -227,10 +228,18 @@ $('#login-form').addEventListener('submit', async e => {
   btn.disabled = false;
 });
 
-async function loadChannels() {
-  S.channelsList = await api(`/api/channels`);
-  $('#channel-list').innerHTML = S.channelsList.map(c => `<a class="nav-item" data-view="slack" data-ch="${c.id}"><span class="ico">#</span>${esc(c.name)}${c.private ? '<span class="lock" style="margin-left:auto">🔒</span>' : ''}</a>`).join('');
-  $$('#channel-list .nav-item').forEach(n => n.onclick = () => navigate('slack', n.dataset.ch));
+async function loadConversations() {
+  S.convs = await api('/api/conversations'); S.unread ||= {};
+  S.colors = { [S.user.id]: S.user.color }; S.convs.forEach(c => { if (c.kind === 'dm') S.colors[c.with] = c.color; });
+  renderConvList();
+}
+function renderConvList() {
+  const item = c => `<a class="nav-item ${S.view === 'slack' && S.conv === c.id ? 'active' : ''}" data-view="slack" data-ch="${esc(c.id)}">
+    ${c.kind === 'dm' ? `<span class="mini-av" style="background:${c.color}">${esc(initials(c.name))}</span>` : '<span class="ico">#</span>'}${esc(c.kind === 'dm' ? c.name.split(' ')[0] : c.name)}
+    ${S.unread[c.id] ? '<span class="unread" title="Nuovi messaggi"></span>' : (c.private ? '<span class="lock" style="margin-left:auto">🔒</span>' : '')}</a>`;
+  $('#channel-list').innerHTML = S.convs.filter(c => c.kind === 'channel').map(item).join('');
+  $('#dm-list').innerHTML = S.convs.filter(c => c.kind === 'dm').map(item).join('');
+  $$('#channel-list .nav-item, #dm-list .nav-item').forEach(n => n.onclick = () => navigate('slack', n.dataset.ch));
 }
 
 async function refreshStatus() {
@@ -247,15 +256,19 @@ async function refreshStatus() {
     const bm = $('#badge-memory'), ba = $('#badge-actions');
     bm.hidden = !s.badges.candidates; bm.textContent = s.badges.candidates;
     ba.hidden = !s.badges.pending; ba.textContent = s.badges.pending;
+    const br = $('#badge-requests'); br.hidden = !s.badges.requests; br.textContent = s.badges.requests;
   } catch (e) { /* il server potrebbe essere in riavvio */ }
 }
 
 function navigate(view, arg, force) {
-  S.view = view; if (view === 'slack') S.channel = arg || S.channel || (S.channelsList[0] && S.channelsList[0].id);
+  S.view = view; if (view === 'slack') S.conv = arg || S.conv || (S.convs[0] && S.convs[0].id);
   $$('.view').forEach(v => v.hidden = v.id !== 'view-' + view);
-  $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view && (view !== 'slack' || n.dataset.ch === S.channel)));
-  const [t, sub] = TITLES[view]; $('#view-title').textContent = view === 'slack' ? '# ' + S.channel : t; $('#view-sub').textContent = sub;
-  ({ chat: renderChat, email: renderEmail, memory: renderMemory, actions: renderActions, calendar: renderCalendar, inbox: renderInbox, slack: renderSlack })[view](force);
+  $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view && (view !== 'slack' || n.dataset.ch === S.conv)));
+  const conv = view === 'slack' && S.convs.find(c => c.id === S.conv);
+  const [t, sub] = TITLES[view];
+  $('#view-title').textContent = conv ? (conv.kind === 'dm' ? conv.name : '# ' + conv.name) : t;
+  $('#view-sub').textContent = conv ? (conv.kind === 'dm' ? 'Messaggio diretto: lo vedete solo voi due' : conv.topic) : sub;
+  ({ chat: renderChat, email: renderEmail, memory: renderMemory, actions: renderActions, calendar: renderCalendar, inbox: renderInbox, slack: renderConv, requests: renderRequests })[view](force);
   refreshStatus();
 }
 $$('.nav-item[data-view]').forEach(n => { if (!n.dataset.ch) n.onclick = () => navigate(n.dataset.view); });
@@ -273,7 +286,7 @@ function msgHTML(m) {
     const b = m.brief;
     inner = `<div class="bubble agent"><div>${esc(b.intro)}</div>
       <div class="alerts">${b.alerts.map((a, i) => `<div class="alert ${a.severity}" style="animation-delay:${i * 70}ms">
-        <h4><span class="sev ${a.severity}">${{ high: 'urgente', med: 'attenzione', low: 'in vista' }[a.severity]}</span>${esc(a.title)}<span class="rule">${{ deadline: '⏰ scadenza', unanswered: '📭 senza risposta', conflict: '⚠️ conflitto', absence: '🏖️ assenza', inbox: '📥 nuova richiesta' }[a.rule]}</span></h4>
+        <h4><span class="sev ${a.severity}">${{ high: 'urgente', med: 'attenzione', low: 'in vista' }[a.severity]}</span>${esc(a.title)}<span class="rule">${{ deadline: '⏰ scadenza', unanswered: '📭 senza risposta', conflict: '⚠️ conflitto', absence: '🏖️ assenza', inbox: '📥 nuova richiesta', request: '🏖️ ferie' }[a.rule]}</span></h4>
         <p>${esc(a.text)}</p>
         <div class="chips">${dedupe(a.sources).map(s => chip(s)).join('')}</div>
         ${a.action ? `<button class="btn sm" data-aact="${esc(a.id)}">${esc(a.action.label)}</button>` : ''}</div>`).join('')}</div>
@@ -455,30 +468,108 @@ function outcomeHTML(o) {
 }
 
 // ------------------------------------------------------------------ canali
-async function renderSlack() {
-  const log = $('#slack-log'); let r;
-  try { r = await api(`/api/channels/${encodeURIComponent(S.channel)}`); } catch (err) { log.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
-  const extra = (S.slack[S.user.id + ':' + S.channel] ||= []);
-  const msg = m => `<div class="msg">${avatar(m.author)}<div class="body"><div class="who-line">${esc(m.author)}<span class="time">${esc(dmy(m.ts))} ${esc(hhmm(m.ts))}</span></div><div>${esc(m.text)}</div></div></div>`;
-  log.innerHTML = `<div class="hello"><b># ${esc(r.channel.name)}</b> ${r.channel.private ? '🔒 privato' : ''}<div class="meta">${esc(r.channel.topic)} · Scrivi <code>@brain</code> + domanda per interpellare il Brain.</div></div>
-    ${r.messages.map(msg).join('')}${extra.join('')}`;
-  $$('#slack-log .msg').forEach(still); $('#slack-scroll').scrollTop = 1e6;
+function msgRow(m) {
+  if (m.author_id === 'brain') {
+    const cites = m.citations || [];
+    return `<div class="msg" data-mid="${esc(m.id)}">${brainAvatar}<div class="body"><div class="who-line">Company Brain <span class="tag">BOT</span><span class="time">${esc(hhmm(m.ts))}</span></div>
+      <div class="bubble agent ${m.kind === 'unknown' ? 'unknown' : ''}">${m.kind === 'unknown' ? '🤷 ' : ''}${fmtText(m.text, cites)}
+      ${cites.length ? `<div class="chips">${cites.map((c, i) => chip(c.source, i + 1)).join('')}</div>` : ''}
+      <div class="brain-note">🔒 In un canale rispondo solo con ciò che tutti i membri possono vedere.</div></div></div></div>`;
+  }
+  const today = (S.now || '').slice(0, 10);
+  const when = m.ts.slice(0, 10) === today ? `oggi ${hhmm(m.ts)}` : `${dmy(m.ts)} ${hhmm(m.ts)}`;
+  return `<div class="msg" data-mid="${esc(m.id)}">${avatar(m.author, S.colors && S.colors[m.author_id])}<div class="body"><div class="who-line">${esc(m.author)}<span class="time">${esc(when)}</span></div><div>${esc(m.text)}</div></div></div>`;
 }
+
+function appendMsg(m) {
+  if (S.shown.has(m.id)) return;
+  S.shown.add(m.id); $('#slack-log').insertAdjacentHTML('beforeend', msgRow(m)); $('#slack-scroll').scrollTop = 1e6;
+}
+
+async function renderConv() {
+  const log = $('#slack-log'); const conv = S.convs.find(c => c.id === S.conv); let msgs;
+  if (!conv) { log.innerHTML = '<div class="empty">Conversazione non disponibile.</div>'; return; }
+  try { msgs = await api(`/api/conversations/${encodeURIComponent(conv.id)}/messages`); } catch (err) { log.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  S.shown = new Set(msgs.map(m => m.id)); S.unread[conv.id] = false; renderConvList();
+  const hello = conv.kind === 'dm'
+    ? `<b>🔒 Messaggio diretto con ${esc(conv.name)}</b><div class="meta">Lo vedete solo voi due: non la CEO, non il Brain.</div>`
+    : `<b># ${esc(conv.name)}</b> ${conv.private ? '🔒 privato' : ''}<div class="meta">${esc(conv.topic)} · Il Brain legge il canale; scrivi <code>@brain</code> + domanda per interpellarlo.</div>`;
+  log.innerHTML = `<div class="hello">${hello}</div>${msgs.map(msgRow).join('')}`;
+  $$('#slack-log .msg').forEach(still); $('#slack-scroll').scrollTop = 1e6;
+  $('#slack-input').placeholder = conv.kind === 'dm' ? `Scrivi a ${conv.name.split(' ')[0]}…` : `Scrivi in #${conv.name}… usa @brain per chiedere`;
+}
+
 $('#slack-form').addEventListener('submit', async e => {
   e.preventDefault(); const inp = $('#slack-input'); const text = inp.value.trim(); if (!text) return; inp.value = '';
-  const key = S.user.id + ':' + S.channel; const extra = (S.slack[key] ||= []); const log = $('#slack-log');
-  const mine = `<div class="msg"><div class="avatar" style="background:${S.user.color}">${esc(initials(S.user.name))}</div><div class="body"><div class="who-line">${esc(S.user.name)}<span class="time">ora</span></div><div>${esc(text)}</div></div></div>`;
-  extra.push(mine); log.insertAdjacentHTML('beforeend', mine);
-  if (/@brain/i.test(text)) {
-    try {
-      const q = text.replace(/@brain/ig, '').trim();
-      const r = await api('/api/ask', { method: 'POST', body: { question: q } });
-      const reply = `<div class="msg">${brainAvatar}<div class="body"><div class="who-line">Company Brain <span class="tag">BOT</span></div><div class="bubble agent ${r.kind === 'unknown' ? 'unknown' : ''}">${fmtText(r.text, r.citations || [])}${(r.citations || []).length ? `<div class="chips">${r.citations.map((c, i) => chip(c.source, i + 1)).join('')}</div>` : ''}${r.action ? actionCard(r.action) : ''}</div></div></div>`;
-      extra.push(reply); log.insertAdjacentHTML('beforeend', reply); refreshStatus();
-    } catch (err) { toast(err.message, 'bad'); }
-  }
-  $('#slack-scroll').scrollTop = 1e6;
+  try { (await api(`/api/conversations/${encodeURIComponent(S.conv)}/messages`, { method: 'POST', body: { text } })).forEach(appendMsg); }
+  catch (err) { toast(err.message, 'bad'); inp.value = text; }
 });
+
+// ------------------------------------------------------------------ richieste (ferie)
+function reqCard(r) {
+  const st = { pending: 'IN ATTESA', approved: 'APPROVATA', rejected: 'RIFIUTATA' }[r.status];
+  const canDecide = S.user.role === 'ceo' && r.status === 'pending';
+  return `<div class="card"><div class="row"><b>🏖️ Ferie · ${esc(r.user_name)}</b><span class="spacer"></span><span class="status ${r.status}">${st}</span></div>
+    <div class="meta">${esc(r.period)}${r.note ? ` · «${esc(r.note)}»` : ''}${r.decided_by ? ` · decisa da ${esc(r.decided_by)}` : ''}</div>
+    <div style="margin-top:10px"><b>🧠 Controlli del Brain</b></div>
+    <ul class="checks">${r.checks.map(c => `<li class="${c.severity}">${c.severity === 'high' ? '⚠️' : '✅'} ${esc(c.text)}${c.sources.length ? `<div class="chips">${c.sources.map(s => chip(s)).join('')}</div>` : ''}</li>`).join('')}</ul>
+    ${canDecide ? `<div class="row" style="margin-top:10px"><button class="btn ok" data-rq="${esc(r.id)}" data-ok="1">✓ Approva</button><button class="btn no" data-rq="${esc(r.id)}" data-ok="0">✕ Rifiuta</button></div>`
+      : (r.status === 'pending' ? '<div class="meta" style="margin-top:8px">In attesa della decisione della CEO.</div>' : '')}</div>`;
+}
+
+async function renderRequests() {
+  const box = $('#requests-body'); let list;
+  try { list = await api('/api/requests'); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  const today = (S.now || '').slice(0, 10);
+  box.innerHTML = `<div class="card"><b>🏖️ Richiedi ferie</b><form id="rq-form" class="form-grid" style="margin-top:10px">
+      <div class="field"><label>Dal</label><input type="date" name="start" required min="${today}"></div>
+      <div class="field"><label>Al</label><input type="date" name="end" required min="${today}"></div>
+      <div class="field" style="grid-column:span 2"><label>Nota (facoltativa)</label><input name="note" maxlength="500"></div>
+      <div class="field"><label>&nbsp;</label><button class="btn" type="submit">Invia richiesta</button></div></form>
+      <div class="meta">La richiesta arriva alla CEO. Il Brain controlla da solo policy e scadenze, ma non decide.</div></div>
+    <h2 class="sec">${S.user.role === 'ceo' ? 'Richieste del team' : 'Le tue richieste'}</h2>
+    ${list.map(reqCard).join('') || '<div class="empty">Nessuna richiesta.</div>'}`;
+  $('#rq-form').onsubmit = async ev => {
+    ev.preventDefault(); const f = new FormData(ev.target);
+    try { await api('/api/requests', { method: 'POST', body: { start: f.get('start'), end: f.get('end'), note: f.get('note') } }); toast('Richiesta inviata alla CEO', 'ok'); renderRequests(); refreshStatus(); }
+    catch (err) { toast(err.message, 'bad'); }
+  };
+  $$('[data-rq]', box).forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { await api(`/api/requests/${b.dataset.rq}/decide`, { method: 'POST', body: { approve: b.dataset.ok === '1' } }); toast(b.dataset.ok === '1' ? '✓ Ferie approvate: aggiunte al calendario' : 'Ferie rifiutate', 'ok'); S.brief = {}; renderRequests(); refreshStatus(); }
+    catch (err) { toast(err.message, 'bad'); b.disabled = false; }
+  });
+}
+
+// ------------------------------------------------------------------ tempo reale
+function notifyToast(n) {
+  const t = document.createElement('div'); t.className = 'toast click'; t.textContent = n.text;
+  t.onclick = () => { if (n.view === 'conv') navigate('slack', n.link); else if (n.view) navigate(n.view); t.remove(); };
+  $('#toasts').append(t); setTimeout(() => { t.style.transition = '.4s'; t.style.opacity = 0; setTimeout(() => t.remove(), 400); }, 6000);
+}
+
+async function poll() {
+  if (!S.user || S.polling) return; S.polling = true;
+  try {
+    const u = await api(`/api/updates${S.seq == null ? '' : `?since=${S.seq}`}`);
+    if (S.seq != null) {
+      let dirty = false;
+      for (const m of u.messages) {
+        if (S.view === 'slack' && m.conv === S.conv) appendMsg(m);
+        else if (m.author_id !== S.user.id && !S.unread[m.conv]) { S.unread[m.conv] = true; dirty = true; }
+      }
+      if (dirty) renderConvList();
+      for (const n of u.notifications) {
+        notifyToast(n);
+        if ((n.kind === 'request' || n.kind === 'inbox') && (S.chat[S.user.id] || []).length) addAgent({ text: '🔔 ' + n.text });   // il Brain parla per primo, anche mentre lavori
+      }
+      if (u.notifications.length) { S.brief = {}; refreshStatus(); }
+      if (u.requests_changed && S.view === 'requests') renderRequests();
+      if (u.notifications.some(n => n.kind === 'inbox') && S.view === 'inbox') renderInbox();
+    }
+    S.seq = u.seq;
+  } catch (e) { /* server in riavvio: riprovo al prossimo giro */ } finally { S.polling = false; }
+}
 
 // ------------------------------------------------------------------ globali
 $('#theme-btn').onclick = () => {
@@ -491,14 +582,15 @@ $('#offline-toggle').onchange = async e => {
   S.brief = {}; toast(e.target.checked ? 'Offline simulato: il Brain usa il fallback deterministico' : 'Rete ripristinata: torno a usare Gemini'); refreshStatus();
 };
 $('#reset-btn').onclick = async () => {
-  await api('/api/reset', { method: 'POST' }); S.chat = {}; S.brief = {}; S.slack = {};
-  toast('Demo ripristinata', 'ok'); navigate(S.view, S.channel, true);
+  await api('/api/reset', { method: 'POST' }); S.chat = {}; S.brief = {}; S.unread = {};
+  toast('Demo ripristinata', 'ok'); navigate(S.view, S.conv, true);
 };
 
 async function startApp() {
   $('#login').hidden = true; $('#app').hidden = false; renderMe();
-  await loadChannels(); await refreshStatus(); navigate('chat');
-  if (!S.timer) S.timer = setInterval(refreshStatus, 20000);
+  await loadConversations(); await refreshStatus(); navigate('chat');
+  S.seq = null; await poll();
+  if (!S.timer) { S.timer = setInterval(refreshStatus, 20000); S.poller = setInterval(poll, 2500); }
 }
 
 (async function init() {

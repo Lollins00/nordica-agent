@@ -183,3 +183,11 @@ textarea{resize:vertical;min-height:90px}
 .action-card textarea{min-height:180px;font:inherit;line-height:1.5}
 
 .card.stale{border-style:dashed;opacity:.8}
+
+.unread{margin-left:auto;width:9px;height:9px;border-radius:50%;background:var(--accent2);box-shadow:0 0 8px var(--accent2);animation:pulse 1.6s infinite}
+.nav-item .mini-av{width:20px;height:20px;border-radius:6px;font-size:10px;display:grid;place-items:center;color:#fff;font-weight:700}
+.checks{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px}
+.checks li{padding:8px 12px;border-radius:10px;background:var(--panel2);border-left:4px solid var(--ok)}
+.checks li.high{border-left-color:var(--bad)}
+.brain-note{font-size:11px;color:var(--muted);margin-top:6px}
+.toast.click{cursor:pointer}

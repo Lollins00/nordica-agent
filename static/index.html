@@ -25,10 +25,13 @@
       <a class="nav-item" data-view="email"><span class="ico">☀️</span>Email del mattino</a>
       <a class="nav-item" data-view="memory"><span class="ico">🧩</span>Memoria<b id="badge-memory" class="badge" hidden>0</b></a>
       <a class="nav-item" data-view="actions"><span class="ico">⚡</span>Azioni<b id="badge-actions" class="badge pulse" hidden>0</b></a>
+      <a class="nav-item" data-view="requests"><span class="ico">🏖️</span>Richieste<b id="badge-requests" class="badge pulse" hidden>0</b></a>
       <a class="nav-item" data-view="calendar"><span class="ico">📅</span>Calendario</a>
       <a class="nav-item" data-view="inbox"><span class="ico">📥</span>Casella agente</a>
       <div class="sec-title">Canali</div>
       <div id="channel-list"></div>
+      <div class="sec-title">Messaggi diretti</div>
+      <div id="dm-list"></div>
     </nav>
 
     <div class="side-foot">
@@ -62,6 +65,8 @@
     <section id="view-actions" class="view" hidden><div class="scroll"><div id="actions-body" class="pad"></div></div></section>
     <section id="view-calendar" class="view" hidden><div class="scroll"><div id="calendar-body" class="pad"></div></div></section>
     <section id="view-inbox" class="view" hidden><div class="scroll"><div id="inbox-body" class="pad"></div></div></section>
+
+    <section id="view-requests" class="view" hidden><div class="scroll"><div id="requests-body" class="pad"></div></div></section>
 
     <section id="view-slack" class="view" hidden>
       <div id="slack-scroll" class="scroll"><div id="slack-log" class="chat-log slack"></div></div>
