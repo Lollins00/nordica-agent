@@ -23,3 +23,8 @@ LLM: Gemini via `GEMINI_API_KEY` da `.env`, sempre con fallback deterministico s
 - Orologio demo fisso (lunedì 23/11/2026 ore 09:00 (settimana di dati 16–20/11)) per risultati ripetibili.
 - Commit piccoli e frequenti. **Niente push**: lo fa l'utente. `.env` e `state/` mai in git.
 - Tempi: demo costruita in meno di 1 ora, poi solo test e rifinitura.
+- Comunicazione interna: canali e messaggi diretti persistenti. I DM sono visibili SOLO ai due partecipanti (mai alla CEO, mai al Brain). Il Brain legge i canali e, con @brain, risponde solo con fatti visibili a TUTTI i membri del canale.
+- Richieste ferie: decide SOLO la CEO; il Brain segnala (preavviso < 15 giorni, scadenze del richiedente) ma non decide.
+- Dati demo ridotti all'essenziale: ogni dato serve a un controllo. Non aggiungere dati di contorno.
+- I test non devono mai toccare state/state.json né inviare email reali (vedi tests/conftest.py). Per prove manuali usare un'istanza separata con STATE_DIR temporanea.
+

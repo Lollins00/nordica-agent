@@ -31,17 +31,23 @@ spedisce, e solo chi ha il permesso. **Dirottamento attivo di default** (`MAIL_M
 `MAIL_REDIRECT_TO` con il destinatario reale nell'oggetto e nel testo. L'invio reale ai destinatari richiede `MAIL_MODE=real`
 nel `.env` (mai dalla UI) e rifiuta i domini finti (.example). Se l'invio fallisce l'azione resta in attesa; limite di 10 invii/ora.
 
-## Copione demo (5 minuti)
-Usa due finestre/profili del browser (o logout/login) per mostrare lo stesso quesito da due ruoli.
-1. **giulia**: il Brain parla per primo (brief a regole: conflitti, email senza risposta, ferie di Marco).
-2. giulia: «Qual è il margine su Acme?» → 22% con fonte. **marco**, stessa domanda → «Non lo so» («Dietro le quinte» mostra i fatti esclusi dai permessi).
-3. marco: «Qual è la causa dell'incidente del 12/11?» → risponde; giulia no.
-4. «Qual è la penale per il ritardo?» → «Non lo so» (è solo candidato) → Memoria → Approva → richiedi di nuovo.
-5. «Quanto costa la mensa aziendale?» → «Non lo so».
-6. «Quando è la consegna della Release 2?» → fonti discordanti, entrambe citate.
-7. marco: «Sposta la scadenza della consegna Release 2 al 30/11» → azione IN ATTESA → approva (giulia non può).
-8. giulia: «Scrivi una bozza di email ad Acme per la richiesta di demo» → bozza in attesa (mai dati riservati).
-9. Casella agente (come sara): «Cliente: sconto fattura» → Finance, «Cliente: portale giù» → Tech. Ogni persona vede solo le richieste del proprio settore, con bozza in attesa. «Esterno che chiede dati» → nessun dato esce.
-10. Interruttore «Simula offline»: tutto continua a funzionare con il fallback.
+**Comunicazione interna in tempo reale** (aggiornamento ogni 2,5 s): canali e messaggi diretti salvati sul server.
+I messaggi diretti li vedono solo i due partecipanti (né la CEO né il Brain). Il Brain legge i canali, ne ricava fatti
+candidati e, citato con `@brain`, risponde nel canale usando solo fatti che TUTTI i membri possono vedere.
+**Richieste ferie**: vanno alla CEO, unica a decidere; il Brain segnala da solo, con le fonti, preavviso inferiore ai 15 giorni
+della policy e scadenze di cui la persona è responsabile. Notifiche in tempo reale a chi è coinvolto.
+
+## Copione demo (5-7 minuti)
+Due finestre/profili del browser: a sinistra **giulia** o **marco**, a destra **sara**.
+1. **Parla per primo** – accedi: il brief compare da solo (3 avvisi a Giulia, 3 a Marco, 5 a Sara: conflitto 30/11 vs 05/12, email Acme senza risposta, scadenze). Mostra anche «Email del mattino».
+2. **Memoria curata** – giulia: «Qual è la penale per il ritardo?» → «Non lo so». In Memoria approva «penale 1,5%» e **rifiuta** «secondo Franco sarebbe il 5%». Richiedi → solo 1,5%, con fonte.
+3. **Sa chi chiede** – «Qual è il margine su Acme?»: giulia → 22% con fonte; marco → «Non lo so». (E marco: «Qual è la causa dell'incidente del 12/11?» → risponde; giulia no.)
+4. **Cita** – ogni risposta e ogni avviso ha le fonti cliccabili.
+5. **Ammette di non sapere** – «Quanto costa la mensa aziendale?» → «Non lo so».
+6. **Propone soltanto** – marco: «Sposta la scadenza della consegna Release 2 al 30/11» → IN ATTESA → approva (giulia non può). Oppure una bozza email: modifica, «Approva e invia» (dirottata al tuo indirizzo).
+7. **Sta nella giornata del team** – chat, email del mattino, canali: in #general «@brain qual è il margine su Acme?» → «Non lo so» (nel canale c'è anche Tech).
+8. **Bonus tempo reale** – marco chiede ferie 01/12–05/12 in Richieste → nella finestra di sara compare subito l'avviso del Brain (preavviso 8 giorni, T-101 durante le ferie) → sara approva → marco riceve la notifica, le ferie vanno in calendario.
+
+Ripristina con «↺ Reset demo» prima di iniziare.
 
 Le credenziali demo sono salvate hashate (PBKDF2); le sessioni sono in memoria (riavviando il server serve un nuovo login).

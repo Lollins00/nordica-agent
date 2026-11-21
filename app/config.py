@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
-STATE_DIR = ROOT / "state"
+STATE_DIR = Path(os.getenv("STATE_DIR") or ROOT / "state")
 STATIC_DIR = ROOT / "static"
 
 
