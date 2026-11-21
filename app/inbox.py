@@ -83,9 +83,9 @@ def ingest(subject: str, body: str, via: str = "simulatore", from_addr: str = ""
     st["extra_sources"].append(src)
     facts, _ = memory.extract_candidates(src)
     name, addr = _display_name(from_addr), from_addr or "mittente@esterno.example"
-    subj, draft_body = actions.write_draft(role, owner["name"], f"{subject}. {body}", name, addr,
-                                           {"subject": subject, "body": body})
-    action = actions.propose_draft(role, "Company Brain", name, addr, subj, draft_body, via="email", reply_to=src["id"],
+    subj, draft_body, sources = actions.write_draft(role, owner["name"], f"{subject}. {body}", name, addr,
+                                           {"subject": subject, "body": body, "id": src["id"]})
+    action = actions.propose_draft(role, "Company Brain", name, addr, subj, draft_body, via="email", reply_to=src["id"], sources=sources,
                                    writer="gemini" if llm.status()["mode"] == "gemini" else "fallback")
     msg = {"id": store.next_id("M"), "subject": subject, "body": body, "from": from_addr or "mittente esterno", "via": via,
            "received_at": now().isoformat(timespec="minutes"), "source_id": src["id"], "routed_role": role,

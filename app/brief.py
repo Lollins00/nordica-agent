@@ -64,7 +64,7 @@ def rule_unanswered(role: str) -> list[dict]:
         sev = "high" if days >= 3 else "med"
         out.append({"id": f"unanswered:{e['id']}", "rule": "unanswered", "severity": sev,
                     "title": f"Email senza risposta: {e['subject']}",
-                    "detail": f"{e['from_name']} ha scritto {days} giorni fa («{e['subject']}») e non c'è ancora una risposta.",
+                    "detail": f"{e['from_name']} ha scritto {'ieri' if days == 1 else f'{days} giorni fa'} («{e['subject']}») e non c'è ancora una risposta.",
                     "sources": [data.source_ref(data.all_sources()[e["id"]])],
                     "action": {"type": "reply_email", "label": "Prepara bozza di risposta", "args": {"email_id": e["id"]}},
                     "_sort": -days})
@@ -174,6 +174,26 @@ def _fallback_intro(first: str, alerts: list[dict]) -> str:
     if not n:
         return f"Buongiorno {first}! Oggi non vedo nulla di urgente: scadenze, email e fonti sono in ordine."
     return f"Buongiorno {first}! Ho controllato scadenze, email e fonti per te: {n} punti da guardare, {hi} urgenti."
+
+
+def render_email(b: dict) -> tuple[str, str]:
+    """Il brief come email vera (testo + HTML), per l'invio dalla vista «Email del mattino»."""
+    import html as h
+    sev = {"high": ("URGENTE", "#f03e3e"), "med": ("ATTENZIONE", "#f59f00"), "low": ("IN VISTA", "#1c7ed6")}
+    lines = [b["intro"], ""]
+    items = []
+    for a in b["alerts"]:
+        label, color = sev[a["severity"]]
+        srcs = ", ".join(s["title"] for s in a["sources"])
+        lines += [f"[{label}] {a['title']}", a["text"], f"Fonti: {srcs}", ""]
+        items.append(f'<div style="border-left:4px solid {color};padding:8px 12px;margin:10px 0;background:#faf9fd;border-radius:6px">'
+                     f'<div style="font-size:11px;font-weight:700;color:{color}">{label}</div><div style="font-weight:600">{h.escape(a["title"])}</div>'
+                     f'<div style="margin:4px 0">{h.escape(a["text"])}</div><div style="font-size:12px;color:#6b6785">Fonti: {h.escape(srcs)}</div></div>')
+    lines.append("— Company Brain · Nordica Srl. Gli avvisi sono decisi da regole sulle fonti che puoi vedere.")
+    html = (f'<div style="font:14px/1.5 Segoe UI,Arial,sans-serif;color:#1d1a2b;max-width:640px">'
+            f'<h2 style="margin:0 0 6px">☀️ {h.escape(b["subject"])}</h2><p>{h.escape(b["intro"])}</p>{"".join(items)}'
+            f'<p style="font-size:12px;color:#6b6785">Company Brain · Nordica Srl — gli avvisi sono decisi da regole, solo sulle fonti che puoi vedere.</p></div>')
+    return "\n".join(lines), html
 
 
 def build_brief(user: dict) -> dict:

@@ -35,7 +35,7 @@ def drop_session(token: str | None) -> None:
 
 
 def public(u: dict) -> dict:
-    return {k: u[k] for k in ("id", "name", "first", "role", "title", "color")}
+    return {k: u[k] for k in ("id", "name", "first", "role", "title", "color", "email")}
 
 
 def current_user(request: Request) -> dict:

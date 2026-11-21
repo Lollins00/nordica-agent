@@ -59,12 +59,21 @@ def propose_event(role: str, who: str, title: str, start: str, end: str | None, 
                    {"title": title, "start": start, "end": end}, via)
 
 
+def _based_on(sources: list[dict]) -> str:
+    return ", ".join(s["title"] for s in sources) if sources else "nessun fatto verificato: risposta interlocutoria"
+
+
 def propose_draft(role: str, who: str, to_name: str, to_addr: str, subject: str, body: str, via: str = "chat",
-                  reply_to: str | None = None, writer: str = "fallback") -> dict:
-    return _create("draft_email", role, who, f"Bozza email a {to_name}", f"Oggetto: {subject}",
-                   [{"label": "A", "value": f"{to_name} <{to_addr}>"}, {"label": "Oggetto", "value": subject},
-                    {"label": "Testo", "value": body}, {"label": "Scritta da", "value": writer}],
-                   {"to": to_addr, "to_name": to_name, "subject": subject, "body": body, "reply_to": reply_to}, via)
+                  reply_to: str | None = None, writer: str = "fallback", sources: list[dict] | None = None) -> dict:
+    sources = sources or []
+    a = _create("draft_email", role, who, f"Bozza email a {to_name}", f"Oggetto: {subject}",
+                [{"label": "A", "value": f"{to_name} <{to_addr}>"}, {"label": "Oggetto", "value": subject},
+                 {"label": "Testo", "value": body}, {"label": "Basata su", "value": _based_on(sources)},
+                 {"label": "Scritta da", "value": writer}],
+                {"to": to_addr, "to_name": to_name, "subject": subject, "body": body, "reply_to": reply_to}, via)
+    a["sources"] = sources                       # controllo 4: anche la bozza dice da dove viene
+    store.save()
+    return a
 
 
 # ----------------------------------------------------------- decisione
@@ -148,7 +157,8 @@ def edit_draft(action_id: str, role: str, who: str, to: str, subject: str, body:
     a["edited_by"], a["edited_at"] = who, now().isoformat(timespec="minutes")
     a["summary"] = f"Oggetto: {subject}"
     a["details"] = [{"label": "A", "value": f"{p['to_name']} <{to}>"}, {"label": "Oggetto", "value": subject},
-                    {"label": "Testo", "value": body}, {"label": "Scritta da", "value": f"{a['original']['writer']} · modificata da {who}"}]
+                    {"label": "Testo", "value": body}, {"label": "Basata su", "value": _based_on(a.get("sources", []))},
+                    {"label": "Scritta da", "value": f"{a['original']['writer']} · modificata da {who}"}]
     store.save()
     return a
 
@@ -163,10 +173,13 @@ def _reply_candidate(role: str, to_addr: str, text: str) -> dict | None:
     return best
 
 
-def write_draft(role: str, who: str, request: str, to_name: str, to_addr: str, reply: dict | None) -> tuple[str, str]:
-    """Testo della bozza. Per i destinatari esterni si usano SOLO fatti con visibilità 'tutti'."""
+def write_draft(role: str, who: str, request: str, to_name: str, to_addr: str, reply: dict | None) -> tuple[str, str, list[dict]]:
+    """Testo della bozza + fonti usate. Per i destinatari esterni si usano SOLO fatti con visibilità 'tutti'."""
     hits, _ = qa.retrieve(role, request)
     ctx = [f for f in hits if f["acl"] == "all"]
+    srcs = data.all_sources()
+    sources = ([data.source_ref(srcs[reply["id"]])] if reply and reply.get("id") in srcs else []) + \
+              [f["source"] for f in ctx if f["source"]["id"] != (reply or {}).get("id")]
     first = to_name.split()[0]
     facts_txt = " ".join(f["statement"] for f in ctx)
     subject = reply["subject"] if reply and reply["subject"].lower().startswith("re:") else (
@@ -181,13 +194,13 @@ def write_draft(role: str, who: str, request: str, to_name: str, to_addr: str, r
     if isinstance(res, dict) and isinstance(res.get("body"), str) and res["body"].strip():
         allowed = numbers_in(facts_txt + " " + request + " " + (reply["body"] if reply else ""))
         if numbers_in(res["body"]) <= allowed:
-            return subject, res["body"].strip() + "\n"
+            return subject, res["body"].strip() + "\n", sources
     body = f"Gentile {first},\n\n"
     about = f" («{reply['subject']}»)" if reply else ""
     body += f"grazie per il messaggio{about}. "
     body += (f"Le confermo quanto segue: {facts_txt}\n\n" if ctx else "Stiamo verificando e le daremo un riscontro puntuale a breve.\n\n")
     body += f"Cordiali saluti,\n{who}\nNordica Srl\n"
-    return subject, body
+    return subject, body, sources
 
 
 def propose_reply_to_email(role: str, who: str, email_id: str, via: str = "brief") -> dict:
@@ -195,9 +208,9 @@ def propose_reply_to_email(role: str, who: str, email_id: str, via: str = "brief
     if not e or not can_see(role, e["acl"]):
         raise LookupError("email non trovata")
     name = e["from_name"].split(" (")[0]
-    subject, body = write_draft(role, who, f"Rispondi a: {e['subject']}", name, e["from"], e)
+    subject, body, sources = write_draft(role, who, f"Rispondi a: {e['subject']}", name, e["from"], e)
     return propose_draft(role, who, name, e["from"], subject, body, via, reply_to=email_id,
-                         writer="gemini" if llm.status()["mode"] == "gemini" else "fallback")
+                         writer="gemini" if llm.status()["mode"] == "gemini" else "fallback", sources=sources)
 
 
 # -------------------------------------------------- da linguaggio naturale
@@ -253,7 +266,7 @@ def propose_from_text(role: str, who: str, text: str, via: str = "chat") -> dict
         return {"kind": "clarify", "text": "A chi devo scrivere? Indicami il destinatario (es. «Acme» o «CloudNord»)."}
     to_name, to_addr = CONTACTS[key]
     reply = _reply_candidate(role, to_addr, text)
-    subject, body = write_draft(role, who, text, to_name, to_addr, reply)
-    a = propose_draft(role, who, to_name, to_addr, subject, body, via, reply_to=reply["id"] if reply else None,
+    subject, body, sources = write_draft(role, who, text, to_name, to_addr, reply)
+    a = propose_draft(role, who, to_name, to_addr, subject, body, via, reply_to=reply["id"] if reply else None, sources=sources,
                       writer="gemini" if llm.status()["mode"] == "gemini" else "fallback")
     return {"kind": "action", "action": a, "text": "Ho scritto una bozza. Resta IN ATTESA: nulla viene inviato finché una persona non approva."}

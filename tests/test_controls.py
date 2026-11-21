@@ -464,3 +464,28 @@ def test_2_demo_step_approve_one_reject_one_then_only_approved_answers():
     r = ask("giulia", q)
     assert r["kind"] == "answer" and [c["fact_id"] for c in r["citations"]] == ["F-ECON-PENALTY"]
     assert "1,5%" in r["text"] and "5% a settimana" not in r["text"].replace("1,5% a settimana", "")
+
+
+def test_4_drafts_cite_their_sources():
+    r = ask("marco", "Scrivi una bozza di email ad Acme per la richiesta di demo")
+    a = r["action"]
+    assert a["sources"] and a["sources"][0]["id"] == "E-02"                       # l'email a cui risponde
+    assert any(d["label"] == "Basata su" for d in a["details"])
+    b = as_("marco").get("/api/brief").json()
+    act = next(x["action"] for x in b["alerts"] if x["action"] and x["action"]["type"] == "reply_email")
+    a2 = as_("marco").post("/api/actions/propose", json={"type": act["type"], "args": act["args"]}).json()
+    assert a2["sources"]
+    m = as_("sara").post("/api/inbox/simulate", json={"from_addr": "x@cliente.it", "subject": "Fattura", "body": "Ci mandate la fattura di novembre?"}).json()
+    draft = next(x for x in as_("sara").get("/api/actions").json() if x["id"] == m["outcome"]["action_id"])
+    assert draft["sources"][0]["id"].startswith("IN-")
+
+
+def test_7_morning_email_can_really_be_sent_and_is_redirected_and_role_filtered():
+    from app.mailer import TEST_SENT as SENT
+    r = as_("marco").post("/api/brief/send")
+    assert r.status_code == 200 and r.json()["mode"] == "redirect" and r.json()["intended_to"] == "marco@nordica.example"
+    m = SENT[-1]
+    assert m["To"] == "demo-owner@test.invalid" and "marco@nordica.example" in m["Subject"]
+    body = m.get_body(preferencelist=("plain",)).get_content()
+    assert "Conflitto tra fonti" in body and "termini di pagamento" not in body    # solo ciò che Marco può vedere
+    assert m.get_body(preferencelist=("html",)) is not None

@@ -8,7 +8,8 @@
   "color": "#f76707",
   "username": "giulia",
   "salt": "77377cd56b401e8c",
-  "password_hash": "a381926528fa5afcb4580b8d6fbe71926fe0e16814ea5834faa9d6bc3bfc91aa"
+  "password_hash": "a381926528fa5afcb4580b8d6fbe71926fe0e16814ea5834faa9d6bc3bfc91aa",
+  "email": "giulia@nordica.example"
  },
  {
   "id": "marco",
@@ -19,7 +20,8 @@
   "color": "#1c7ed6",
   "username": "marco",
   "salt": "ca029f714fe28d25",
-  "password_hash": "e105d5d5a118370e9eadad6b8f4029a293b731d8254bc71faa0e36cedd21d930"
+  "password_hash": "e105d5d5a118370e9eadad6b8f4029a293b731d8254bc71faa0e36cedd21d930",
+  "email": "marco@nordica.example"
  },
  {
   "id": "sara",
@@ -30,6 +32,7 @@
   "color": "#7048e8",
   "username": "sara",
   "salt": "deaf67b66eba9f0f",
-  "password_hash": "c8533bd21dda63936be13c554c4b772852f14fac9c68ea0e69e3efd4f258e01b"
+  "password_hash": "c8533bd21dda63936be13c554c4b772852f14fac9c68ea0e69e3efd4f258e01b",
+  "email": "sara@nordica.example"
  }
 ]

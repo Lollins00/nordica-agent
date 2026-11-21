@@ -76,7 +76,7 @@ def _deliver(msg: EmailMessage) -> None:
         s.send_message(msg)
 
 
-def send(to: str, subject: str, body: str) -> dict:
+def send(to: str, subject: str, body: str, html: str | None = None) -> dict:
     """Invia (o dirotta) un'email. Solleva MailError se non parte: il chiamante non deve segnare l'azione come fatta."""
     if not configured():
         raise MailError("SMTP non configurato")
@@ -94,6 +94,9 @@ def send(to: str, subject: str, body: str) -> dict:
         subj = f"[DEMO → {to}] {subject}"
         text = (f"⚠️ Email di prova: in modalità demo è stata dirottata qui.\nDestinatario reale: {to}\n"
                 f"{'-' * 60}\n\n{body}")
+        if html:
+            html = ('<div style="background:#e7f5ff;border:1px solid #a5d8ff;border-radius:8px;padding:8px 12px;margin-bottom:14px;'
+                    f'font:13px sans-serif;color:#0b5394">⚠️ Email di prova dirottata in modalità demo. Destinatario reale: <b>{to}</b></div>' + html)
     else:
         if to.lower().endswith(RESERVED):
             raise MailError("indirizzo di esempio: in modalità reale non invio a domini riservati")
@@ -104,6 +107,8 @@ def send(to: str, subject: str, body: str) -> dict:
     msg["Date"], msg["Message-ID"] = formatdate(localtime=True), make_msgid()
     msg["X-Company-Brain"] = "outbound"
     msg.set_content(text)
+    if html:
+        msg.add_alternative(html, subtype="html")
     _rate_limit()
     try:
         _deliver(msg)

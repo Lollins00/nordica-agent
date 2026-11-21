@@ -61,6 +61,7 @@ function debugHTML(d, writer) {
     <span>Visibili al tuo ruolo</span><b>${d.approved_visible}</b>
     <span>Esclusi dai permessi <i>(prima dell'LLM)</i></span><b>${d.excluded_by_permissions}${d.excluded_matching ? ` · ${d.excluded_matching} pertinenti alla domanda` : ''}</b>
     <span>Fatti usati</span><b>${d.matched.length ? esc(d.matched.join(', ')) : '—'}</b>
+    ${d.expanded ? `<span>Domanda riformulata da Gemini <i>(solo la domanda, nessun dato)</i></span><b>${d.expanded.map(c => (c.essential ? '★ ' : '') + esc(c.terms.slice(0, 4).join(' / '))).join(' · ')}</b>` : ''}
     <span>Testo scritto da</span><b>${esc(writer)}</b></div></details>`;
 }
 
@@ -80,7 +81,8 @@ function actionCard(a) {
   const isMail = a.type === 'draft_email';
   return `<div class="card action-card" data-aid="${esc(a.id)}">
     <div class="row"><b>${typeIco} ${esc(a.title)}</b><span class="spacer"></span><span class="status ${a.status}">${st}</span></div>
-    <dl class="kv">${(a.details || []).map(d => `<dt>${esc(d.label)}</dt><dd>${esc(d.value)}</dd>`).join('')}</dl>
+    <dl class="kv">${(a.details || []).filter(d => d.label !== 'Basata su').map(d => `<dt>${esc(d.label)}</dt><dd>${esc(d.value)}</dd>`).join('')}</dl>
+    ${a.type === 'draft_email' ? `<div class="meta">📎 Basata su:</div><div class="chips" style="margin-top:4px">${(a.sources || []).map(s => chip(s)).join('') || '<span class="tag">nessun fatto verificato: risposta interlocutoria</span>'}</div>` : ''}
     <div class="meta">Proposta da ${esc(a.proposed_by)} · via ${esc(a.via)} · ${esc(a.id)}${a.edited_by ? ` · ✏️ modificata da ${esc(a.edited_by)}` : ''}${a.decided_by ? ` · decisa da ${esc(a.decided_by)}` : ''}</div>
     ${a.status === 'pending'
       ? `<div class="row" style="margin-top:10px">
@@ -353,8 +355,16 @@ async function renderEmail(force) {
       <div class="from"><div class="avatar brain" style="width:30px;height:30px">🧠</div><span><b>Company Brain</b> &lt;brain@nordica.example&gt; → ${esc(S.user.name)} · ${esc(dmy(b.generated_at))} ${esc(hhmm(b.generated_at))}</span><span class="spacer"></span>${writerTag(b.writer)}</div></div>
     <div class="mail-body"><p>${esc(b.intro)}</p>
       <div class="alerts">${b.alerts.map((a, i) => `<div class="alert ${a.severity}" style="animation-delay:${i * 60}ms"><h4><span class="sev ${a.severity}">${{ high: 'urgente', med: 'attenzione', low: 'in vista' }[a.severity]}</span>${esc(a.title)}</h4><p>${esc(a.text)}</p><div class="chips">${dedupe(a.sources).map(s => chip(s)).join('')}</div></div>`).join('') || '<div class="empty">Nessun avviso 🎉</div>'}</div>
-      <div class="row" style="margin-top:16px"><button class="btn sec" id="regen">↻ Rigenera</button><span class="meta">Avvisi decisi da regole; il testo è scritto da ${b.writer === 'gemini' ? 'Gemini' : 'un template deterministico'}. Nessuna email viene inviata: resta tutto qui.</span></div></div></div>`;
+      <div class="row" style="margin-top:16px"><button class="btn" id="send-brief">📧 Inviami questa email</button><button class="btn sec" id="regen">↻ Rigenera</button><span class="meta">Avvisi decisi da regole; il testo è scritto da ${b.writer === 'gemini' ? 'Gemini' : 'un template deterministico'}. Nessuna email viene inviata: resta tutto qui.</span></div></div></div>`;
   $('#regen').onclick = () => renderEmail('refresh');
+  $('#send-brief').onclick = async ev => {
+    ev.target.disabled = true; ev.target.textContent = 'Invio…';
+    try {
+      const r = await api('/api/brief/send', { method: 'POST' });
+      toast(r.mode === 'redirect' ? `📧 Inviata a ${r.sent_to} (modalità demo: destinatario reale ${r.intended_to})` : `📧 Inviata a ${r.sent_to}`, 'ok');
+    } catch (err) { toast(err.message, 'bad'); }
+    ev.target.disabled = false; ev.target.textContent = '📧 Inviami questa email';
+  };
 }
 
 // ------------------------------------------------------------------ memoria
@@ -577,6 +587,14 @@ $('#theme-btn').onclick = () => {
   document.documentElement.dataset.theme = t; try { localStorage.setItem('theme', t); } catch (e) { /* ok */ }
   $('#theme-btn').textContent = t === 'dark' ? '☀️' : '🌙';
 };
+(function techToggle() {
+  let on = false; try { on = localStorage.getItem('tech') === '1'; } catch (e) { /* ok */ }
+  document.body.classList.toggle('tech', on); $('#tech-toggle').checked = on;
+  $('#tech-toggle').onchange = e => {
+    document.body.classList.toggle('tech', e.target.checked);
+    try { localStorage.setItem('tech', e.target.checked ? '1' : '0'); } catch (err) { /* ok */ }
+  };
+})();
 $('#offline-toggle').onchange = async e => {
   await api('/api/llm/offline', { method: 'POST', body: { offline: e.target.checked } });
   S.brief = {}; toast(e.target.checked ? 'Offline simulato: il Brain usa il fallback deterministico' : 'Rete ripristinata: torno a usare Gemini'); refreshStatus();

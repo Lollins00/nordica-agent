@@ -80,6 +80,19 @@ def api_brief(u: dict = Depends(current_user)):
     return brief.build_brief(u)
 
 
+@app.post("/api/brief/send")
+def api_brief_send(u: dict = Depends(current_user)):
+    """Invia a sé stessi il brief del mattino (in modalità demo viene dirottato a MAIL_REDIRECT_TO)."""
+    if not mailer.configured():
+        raise HTTPException(409, "Invio email non configurato (IMAP_USER / IMAP_PASSWORD nel .env)")
+    b = brief.build_brief(u)
+    text, html = brief.render_email(b)
+    try:
+        return mailer.send(u["email"], b["subject"], text, html)
+    except mailer.MailError as e:
+        raise HTTPException(502, str(e))
+
+
 @app.post("/api/brief/refresh")
 def api_brief_refresh(u: dict = Depends(current_user)):
     store.get()["brief_cache"].clear()
