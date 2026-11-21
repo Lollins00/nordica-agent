@@ -175,7 +175,7 @@ def _reply_candidate(role: str, to_addr: str, text: str) -> dict | None:
 
 def write_draft(role: str, who: str, request: str, to_name: str, to_addr: str, reply: dict | None) -> tuple[str, str, list[dict]]:
     """Testo della bozza + fonti usate. Per i destinatari esterni si usano SOLO fatti con visibilità 'tutti'."""
-    hits, _ = qa.retrieve(role, request)
+    hits, _ = qa.retrieve(role, request, expand=False)   # in un'email a un esterno solo fatti pertinenti alla lettera
     ctx = [f for f in hits if f["acl"] == "all"]
     srcs = data.all_sources()
     sources = ([data.source_ref(srcs[reply["id"]])] if reply and reply.get("id") in srcs else []) + \

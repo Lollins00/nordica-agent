@@ -181,7 +181,8 @@ THRESHOLD = 1.0
 UNKNOWN_TEXT = "Non lo so: tra i fatti approvati che posso consultare non c'è nulla che risponda a questa domanda."
 
 
-def retrieve(role: str, question: str, k: int = 5, audience: tuple[str, ...] | None = None) -> tuple[list[dict], dict]:
+def retrieve(role: str, question: str, k: int = 5, audience: tuple[str, ...] | None = None,
+             expand: bool = True) -> tuple[list[dict], dict]:
     """Ritorna (fatti pertinenti visibili, debug). I fatti non visibili vengono esclusi PRIMA del ranking.
     `audience`: ruoli che leggeranno la risposta (es. i membri di un canale). Un fatto passa solo se lo
     possono vedere TUTTI: così una risposta in un canale non mostra a nessuno ciò che non potrebbe vedere."""
@@ -196,7 +197,7 @@ def retrieve(role: str, question: str, k: int = 5, audience: tuple[str, ...] | N
     ranked = sorted(((score(qs, f, names), f) for f in approved), key=lambda x: -x[0])
     hits = [f for s, f in ranked if s >= THRESHOLD][:k]
     expanded = None
-    if not hits and role:
+    if not hits and role and expand:
         # Nessun fatto trovato con le parole esatte: prima di dire «non lo so» chiedo a Gemini di riformulare
         # la domanda (solo la domanda). I fatti restano quelli già filtrati per permessi.
         concepts = expand_query(question)
