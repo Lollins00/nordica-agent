@@ -61,20 +61,20 @@ def generate(prompt: str, system: str | None = None, json_mode: bool = False, ma
         body["systemInstruction"] = {"parts": [{"text": system}]}
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
-    deadline = time.time() + 22
+    deadline = time.time() + 9
     for i, model in enumerate(models()[:3]):
         remaining = deadline - time.time()
         if remaining < 3:
             break
         try:
-            r = _post(model, body, timeout=min(12 if i == 0 else 8, remaining))
+            r = _post(model, body, timeout=min(7 if i == 0 else 4, remaining))
         except requests.ConnectionError as e:   # niente rete: inutile riprovare, apro il circuito per 60s
             _status.update(last_ok=False, last_error=f"rete non raggiungibile ({type(e).__name__})",
                            down_until=time.time() + 60)
             return None
-        except requests.Timeout:
-            _status.update(last_ok=False, last_error=f"timeout su {model}")
-            continue
+        except requests.Timeout:   # Gemini non risponde: non faccio aspettare la demo, circuito aperto per 90s
+            _status.update(last_ok=False, last_error=f"timeout su {model}", down_until=time.time() + 90)
+            return None
         if r.status_code != 200:
             _status.update(last_ok=False, last_error=f"{model}: HTTP {r.status_code}")
             continue

@@ -1,0 +1,90 @@
+- generic [ref=e5]:
+  - complementary [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: "N"
+      - generic [ref=e9]:
+        - text: Nordica Srl
+        - generic [ref=e10]: Company Brain
+      - button "Cambia tema" [ref=e11] [cursor=pointer]: 🌙
+    - generic [ref=e12]:
+      - text: Stai usando come
+      - generic [ref=e13]:
+        - button "GB Giulia Bianchi Finance" [ref=e14] [cursor=pointer]:
+          - generic [ref=e15]: GB
+          - generic [ref=e16]:
+            - text: Giulia Bianchi
+            - generic [ref=e17]: Finance
+        - button "MR Marco Rossi Tech Lead" [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: MR
+          - generic [ref=e20]:
+            - text: Marco Rossi
+            - generic [ref=e21]: Tech Lead
+        - button "SC Sara Conti CEO" [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: SC
+          - generic [ref=e24]:
+            - text: Sara Conti
+            - generic [ref=e25]: CEO
+    - navigation [ref=e26]:
+      - generic [ref=e27]: Company Brain
+      - generic [ref=e28] [cursor=pointer]:
+        - generic [ref=e29]: 🧠
+        - text: Chiedi al Brain
+      - generic [ref=e30] [cursor=pointer]:
+        - generic [ref=e31]: ☀️
+        - text: Email del mattino
+      - generic [ref=e32] [cursor=pointer]:
+        - generic [ref=e33]: 🧩
+        - text: Memoria
+        - generic [ref=e34]: "8"
+      - generic [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: ⚡
+        - text: Azioni
+      - generic [ref=e37] [cursor=pointer]:
+        - generic [ref=e38]: 📅
+        - text: Calendario
+      - generic [ref=e39] [cursor=pointer]:
+        - generic [ref=e40]: 📥
+        - text: Casella agente
+      - generic [ref=e41]: Canali (mock Slack)
+      - generic [ref=e42]:
+        - generic [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]: "#"
+          - text: general
+        - generic [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]: "#"
+          - text: acme-delivery
+        - generic [ref=e47] [cursor=pointer]:
+          - generic [ref=e48]: "#"
+          - text: finance
+          - generic [ref=e49]: 🔒
+    - generic [ref=e50]:
+      - generic [ref=e51]: Gemini pronto · gemini-3.8-flash
+      - 'generic "Simula assenza di rete: il Brain continua a funzionare con il fallback deterministico" [ref=e54] [cursor=pointer]':
+        - checkbox "Simula offline" [ref=e55]
+        - generic [ref=e56]: Simula offline
+      - button "↺ Reset demo" [ref=e57] [cursor=pointer]
+  - main [ref=e58]:
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - heading "Chiedi al Brain" [level=1] [ref=e61]
+        - paragraph [ref=e62]: Risponde solo da fatti approvati, nei limiti dei tuoi permessi
+      - generic [ref=e63]: 🕘 lunedì 23 novembre · 09:00
+    - generic [ref=e64]:
+      - generic [ref=e67]:
+        - generic [ref=e68]: 🧠
+        - generic [ref=e69]:
+          - generic [ref=e70]: Company Brain09:00
+          - generic [ref=e71]: Buongiorno Giulia! Sto leggendo email, chat, task e calendario…
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - button "Qual è il margine su Acme?" [ref=e76] [cursor=pointer]
+          - button "Qual è la causa dell'incidente del 12/11?" [ref=e77] [cursor=pointer]
+          - button "Quando è la consegna della Release 2?" [ref=e78] [cursor=pointer]
+          - button "Qual è la penale per il ritardo?" [ref=e79] [cursor=pointer]
+          - button "Quanto costa la mensa aziendale?" [ref=e80] [cursor=pointer]
+          - button "Sposta la scadenza della consegna Release 2 al 30/11" [ref=e81] [cursor=pointer]
+          - button "Scrivi una bozza di email ad Acme per la richiesta di demo" [ref=e82] [cursor=pointer]
+          - button "Fissa una call con Acme giovedì alle 15" [ref=e83] [cursor=pointer]
+        - generic [ref=e84]:
+          - textbox "Chiedi qualcosa al Brain, o chiedi di preparare un'azione…" [ref=e85]
+          - button "Invia" [ref=e86] [cursor=pointer]: ➤

@@ -1,0 +1,7 @@
+[     310ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/favicon.ico:1
+[  111835ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/channels?user=marco:1
+[  111838ms] TypeError: Failed to fetch
+    at api (http://localhost:8000/static/app.js:8:19)
+    at loadChannels (http://localhost:8000/static/app.js:144:26)
+    at switchUser (http://localhost:8000/static/app.js:138:9)
+    at b.onclick (http://localhost:8000/static/app.js:131:50)

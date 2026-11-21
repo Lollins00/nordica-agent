@@ -13,6 +13,8 @@ app = FastAPI(title="Company Brain · Nordica")
 
 @app.on_event("startup")
 def _startup():
+    import threading
+    threading.Thread(target=lambda: llm.generate("Rispondi solo: ok", max_tokens=64), daemon=True).start()  # riscaldamento: scopre subito se Gemini risponde
     inbox.start_background_poll()
 
 
