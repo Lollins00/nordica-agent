@@ -143,6 +143,9 @@ def imap_poll_once(limit: int = 15) -> int:
             if mid in seen:
                 continue
             seen.append(mid)
+            sender = email.utils.parseaddr(m.get("From", ""))[1].lower()
+            if sender == (os.getenv("IMAP_USER") or "").lower() or m.get("X-Company-Brain"):
+                continue                              # mai rileggere le email inviate dall'agente stesso (niente cicli)
             subject = str(make_header(decode_header(m.get("Subject", ""))))
             ingest(subject, _body_of(m).strip(), via="IMAP", from_addr=email.utils.parseaddr(m.get("From", ""))[1])
             n += 1

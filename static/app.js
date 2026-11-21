@@ -64,36 +64,95 @@ function debugHTML(d, writer) {
 }
 
 // ------------------------------------------------------------------ azioni (card)
+const mailBanner = () => {
+  const m = S.status && S.status.mail; if (!m || !m.configured) return '';
+  return m.mode === 'redirect'
+    ? `<div class="banner demo">📬 <b>Modalità demo</b>: le email approvate vengono <b>dirottate a ${esc(m.redirect_to || '—')}</b>, non ai destinatari reali.</div>`
+    : '<div class="banner real">⚠️ <b>Invio reale attivo</b>: le email approvate partono davvero verso i destinatari.</div>';
+};
+
 function actionCard(a) {
+  (S.act ||= {})[a.id] = a;
   const can = a.approvers && a.approvers.includes(S.user.role);
   const st = { pending: 'IN ATTESA', approved: 'APPROVATA', rejected: 'RIFIUTATA' }[a.status];
   const typeIco = { change_deadline: '🗓️', draft_email: '✉️', create_event: '📅' }[a.type] || '⚡';
+  const isMail = a.type === 'draft_email';
   return `<div class="card action-card" data-aid="${esc(a.id)}">
     <div class="row"><b>${typeIco} ${esc(a.title)}</b><span class="spacer"></span><span class="status ${a.status}">${st}</span></div>
     <dl class="kv">${(a.details || []).map(d => `<dt>${esc(d.label)}</dt><dd>${esc(d.value)}</dd>`).join('')}</dl>
-    <div class="meta">Proposta da ${esc(a.proposed_by)} · via ${esc(a.via)} · ${esc(a.id)}${a.decided_by ? ` · decisa da ${esc(a.decided_by)}` : ''}</div>
+    <div class="meta">Proposta da ${esc(a.proposed_by)} · via ${esc(a.via)} · ${esc(a.id)}${a.edited_by ? ` · ✏️ modificata da ${esc(a.edited_by)}` : ''}${a.decided_by ? ` · decisa da ${esc(a.decided_by)}` : ''}</div>
     ${a.status === 'pending'
       ? `<div class="row" style="margin-top:10px">
-          <button class="btn ok" data-decide="1" ${can ? '' : 'disabled'}>✓ Approva</button>
+          <button class="btn ok" data-decide="1" ${can ? '' : 'disabled'}>${isMail ? '✓ Approva e invia' : '✓ Approva'}</button>
+          ${isMail && can ? '<button class="btn sec" data-edit="1">✏️ Modifica</button>' : ''}
           <button class="btn no" data-decide="0" ${can ? '' : 'disabled'}>✕ Rifiuta</button>
           ${can ? '' : `<span class="meta">Può decidere solo: ${a.approvers.join(', ')}</span>`}</div>`
       : `<div class="meta" style="margin-top:8px">→ ${esc(a.result || '')}</div>`}
   </div>`;
 }
 
+const replaceCards = a => $$(`.action-card[data-aid="${a.id}"]`).forEach(c => { c.outerHTML = actionCard(a); });
+
+async function decideAction(id, approve, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const a = await api(`/api/actions/${id}/decide`, { method: 'POST', body: { approve } });
+    replaceCards(a);
+    toast(a.status === 'approved' ? '✓ ' + a.result : 'Rifiutata: nessuna modifica', a.status === 'approved' ? 'ok' : '');
+    S.brief = {}; refreshStatus(); if (S.view === 'actions') renderActions();
+  } catch (err) { toast(err.message, 'bad'); if (btn) btn.disabled = false; }
+}
+
+function openSendConfirm(a) {
+  const m = (S.status && S.status.mail) || {}; const p = a.payload;
+  const redirected = m.mode === 'redirect';
+  $('#modal-body').innerHTML = `<h3 style="margin:0 0 8px">Inviare questa email?</h3>
+    ${redirected
+      ? `<div class="banner demo">📬 Modalità demo: partirà verso <b>${esc(m.redirect_to || '— non impostato —')}</b>, <u>non</u> verso il destinatario reale. Il destinatario reale sarà scritto nel testo.</div>`
+      : `<div class="banner real">⚠️ <b>Invio reale</b>: l'email partirà davvero verso <b>${esc(p.to)}</b>. Non si può ritirare.</div>`}
+    <dl class="kv"><dt>Da</dt><dd>${esc(m.from || 'agente')}</dd>
+      <dt>Destinatario</dt><dd>${esc(p.to_name || '')} &lt;${esc(p.to)}&gt;</dd>
+      <dt>Parte verso</dt><dd><b>${esc(redirected ? (m.redirect_to || '—') : p.to)}</b></dd>
+      <dt>Oggetto</dt><dd>${esc(redirected ? `[DEMO → ${p.to}] ` : '')}${esc(p.subject)}</dd></dl>
+    <div class="src-text">${esc(p.body)}</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn sec" id="send-cancel">Annulla</button>
+      <button class="btn ok" id="send-go">✓ Invia ora</button></div>`;
+  $('#modal').hidden = false;
+  $('#send-cancel').onclick = () => $('#modal').hidden = true;
+  $('#send-go').onclick = async () => { $('#send-go').disabled = true; $('#send-go').textContent = 'Invio…'; await decideAction(a.id, true); $('#modal').hidden = true; };
+}
+
+function startEdit(id) {
+  const a = S.act[id]; const p = a.payload; const card = $(`.action-card[data-aid="${id}"]`);
+  card.innerHTML = `<div class="row"><b>✏️ Modifica bozza</b><span class="spacer"></span><span class="status pending">IN ATTESA</span></div>
+    <div class="form-grid" style="margin-top:10px"><div class="field"><label>Destinatario (email)</label><input name="to" type="email" required value="${esc(p.to)}"></div>
+    <div class="field" style="grid-column:span 2"><label>Oggetto</label><input name="subject" maxlength="200" value="${esc(p.subject)}"></div></div>
+    <div class="field" style="margin-top:8px"><label>Testo</label><textarea name="body" rows="10" maxlength="10000">${esc(p.body)}</textarea></div>
+    ${a.original ? '<div class="meta">La versione originale dell\'AI resta registrata.</div>' : ''}
+    <div class="row" style="margin-top:10px"><button class="btn" data-save="1">💾 Salva modifiche</button><button class="btn sec" data-cancel="1">Annulla</button>
+    <span class="meta">Salvare non invia nulla: la bozza resta in attesa.</span></div>`;
+  $('[data-cancel]', card).onclick = () => replaceCards(S.act[id]);
+  $('[data-save]', card).onclick = async ev => {
+    ev.target.disabled = true;
+    try {
+      const upd = await api(`/api/actions/${id}/edit`, { method: 'POST', body: { to: $('[name=to]', card).value, subject: $('[name=subject]', card).value, body: $('[name=body]', card).value } });
+      replaceCards(upd); toast('Bozza salvata (ancora in attesa)', 'ok');
+    } catch (err) { toast(err.message, 'bad'); ev.target.disabled = false; }
+  };
+  $('[name=body]', card).focus();
+}
+
 document.addEventListener('click', async e => {
   const src = e.target.closest('[data-src]');
   if (src) return openSource(src.dataset.src);
+  const ed = e.target.closest('[data-edit]');
+  if (ed) return startEdit(ed.closest('.action-card').dataset.aid);
   const dec = e.target.closest('[data-decide]');
   if (dec) {
-    const card = dec.closest('.action-card'); const id = card.dataset.aid;
-    try {
-      const a = await api(`/api/actions/${id}/decide`, { method: 'POST', body: { approve: dec.dataset.decide === '1' } });
-      $$(`.action-card[data-aid="${id}"]`).forEach(c => { c.outerHTML = actionCard(a); });
-      toast(a.status === 'approved' ? '✓ Approvata: ' + a.result : 'Rifiutata: nessuna modifica', a.status === 'approved' ? 'ok' : '');
-      S.brief = {}; refreshStatus(); if (S.view === 'actions') renderActions();
-    } catch (err) { toast(err.message, 'bad'); }
-    return;
+    const id = dec.closest('.action-card').dataset.aid; const a = S.act && S.act[id];
+    const approve = dec.dataset.decide === '1';
+    if (approve && a && a.type === 'draft_email') return openSendConfirm(a);     // conferma esplicita prima di inviare
+    return decideAction(id, approve, dec);
   }
   const act = e.target.closest('[data-aact]');
   if (act) {
@@ -312,7 +371,7 @@ async function renderActions() {
   const box = $('#actions-body'); let list;
   try { list = await api(`/api/actions`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   const shown = S.actFilter === 'pending' ? list.filter(a => a.status === 'pending') : list;
-  box.innerHTML = `<div class="tabs"><button class="tab ${S.actFilter === 'all' ? 'active' : ''}" data-f="all">Tutte (${list.length})</button>
+  box.innerHTML = `${mailBanner()}<div class="tabs"><button class="tab ${S.actFilter === 'all' ? 'active' : ''}" data-f="all">Tutte (${list.length})</button>
     <button class="tab ${S.actFilter === 'pending' ? 'active' : ''}" data-f="pending">In attesa (${list.filter(a => a.status === 'pending').length})</button></div>
     ${shown.map(actionCard).join('') || '<div class="empty">Nessuna azione. Prova: «Sposta la scadenza della consegna Release 2 al 30/11» nella chat.</div>'}`;
   $$('.tab', box).forEach(t => t.onclick = () => { S.actFilter = t.dataset.f; renderActions(); });

@@ -2,7 +2,7 @@
 effetto finché una persona abilitata non approva (comandamento 6)."""
 import re
 
-from . import data, events, llm, memory, qa, store
+from . import data, events, llm, mailer, memory, qa, store
 from .config import NOW, TODAY
 from .permissions import can_see
 from .util import fmt_date, fmt_dt, fmt_short, norm, numbers_in, parse_date, parse_time
@@ -81,9 +81,17 @@ def _execute(a: dict) -> str:
         events.add_event(a["proposed_role"], a["decided_by"], p["title"], p["start"], p.get("end"), via="azione approvata")
         return f"Evento «{p['title']}» aggiunto al calendario."
     if a["type"] == "draft_email":
-        st.setdefault("outbox", []).append({"to": p["to"], "subject": p["subject"], "body": p["body"],
-                                            "at": NOW.isoformat(timespec="minutes")})
-        return "Bozza approvata e registrata come inviata (simulazione: nessuna email esce dalla UI)."
+        if not mailer.configured():
+            st.setdefault("outbox", []).append({"to": p["to"], "subject": p["subject"], "body": p["body"], "at": NOW.isoformat(timespec="minutes")})
+            return "Bozza approvata e registrata come inviata (simulazione: SMTP non configurato)."
+        res = mailer.send(p["to"], p["subject"], p["body"])          # solleva MailError se non parte
+        a["sent"] = res
+        st.setdefault("outbox", []).append({"to": res["sent_to"], "intended_to": res["intended_to"], "subject": p["subject"],
+                                            "body": p["body"], "at": res["at"], "mode": res["mode"]})
+        hhmm = res["at"][11:16]
+        if res["mode"] == "redirect":
+            return f"Inviata alle {hhmm} in modalità demo: dirottata a {res['sent_to']} (destinatario reale: {res['intended_to']})."
+        return f"Inviata a {res['intended_to']} alle {hhmm}."
     return "ok"
 
 
@@ -98,10 +106,49 @@ def decide(action_id: str, role: str, who: str, approve: bool) -> dict:
         raise PermissionError("il tuo ruolo non può decidere questa azione")
     a["decided_by"], a["decided_at"] = who, NOW.isoformat(timespec="minutes")
     if approve:
-        a["status"], a["result"] = "approved", _execute(a)
+        try:
+            a["result"] = _execute(a)
+        except mailer.MailError as e:
+            a["decided_by"] = a["decided_at"] = None                 # l'azione resta IN ATTESA: nulla è partito
+            raise RuntimeError(str(e))
+        a["status"] = "approved"
     else:
         a["status"], a["result"] = "rejected", "Rifiutata: nessuna modifica effettuata."
     st["brief_cache"].clear()
+    store.save()
+    return a
+
+
+def edit_draft(action_id: str, role: str, who: str, to: str, subject: str, body: str) -> dict:
+    """Una persona modifica la bozza dell'AI. Resta IN ATTESA; si conserva l'originale per tracciabilità."""
+    st = store.get()
+    a = next((x for x in st["actions"] if x["id"] == action_id and can_see(role, x["acl"])), None)
+    if not a:
+        raise LookupError("azione non trovata")
+    if a["type"] != "draft_email" or a["status"] != "pending":
+        raise ValueError("si possono modificare solo bozze email ancora in attesa")
+    if role not in a["approvers"]:
+        raise PermissionError("il tuo ruolo non può modificare questa bozza")
+    try:
+        to, subject = mailer.clean_header(to, "destinatario"), mailer.clean_header(subject, "oggetto")
+    except mailer.MailError as e:
+        raise ValueError(str(e))
+    body = (body or "").replace("\r\n", "\n").strip()
+    if not mailer.valid_address(to):
+        raise ValueError("indirizzo del destinatario non valido")
+    if not subject or len(subject) > 200:
+        raise ValueError("oggetto mancante o troppo lungo (max 200 caratteri)")
+    if not body or len(body) > 10000:
+        raise ValueError("testo mancante o troppo lungo (max 10000 caratteri)")
+    p = a["payload"]
+    if "original" not in a:
+        a["original"] = {"to": p["to"], "subject": p["subject"], "body": p["body"],
+                         "writer": next((d["value"] for d in a["details"] if d["label"] == "Scritta da"), "")}
+    p.update(to=to, subject=subject, body=body, to_name=p.get("to_name") or to)
+    a["edited_by"], a["edited_at"] = who, NOW.isoformat(timespec="minutes")
+    a["summary"] = f"Oggetto: {subject}"
+    a["details"] = [{"label": "A", "value": f"{p['to_name']} <{to}>"}, {"label": "Oggetto", "value": subject},
+                    {"label": "Testo", "value": body}, {"label": "Scritta da", "value": f"{a['original']['writer']} · modificata da {who}"}]
     store.save()
     return a
 

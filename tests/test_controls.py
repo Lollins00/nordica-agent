@@ -294,3 +294,108 @@ def test_inbox_approved_facts_answer_questions_about_the_sender():
         assert r["kind"] == "answer" and r["citations"], q
     assert ask("giulia", "Ho problemi con Logistica Verdi?")["kind"] == "unknown"       # Finance non vede la richiesta Tech
     assert ask("marco", "Quanto costa la mensa di Logistica Verdi?")["kind"] == "unknown"
+
+
+# invio email dalla dashboard (SMTP, dirottamento attivo) ------------------------------
+def _draft(user="giulia"):
+    r = ask(user, "Scrivi una bozza di email ad Acme per rispondere sui termini di pagamento")
+    assert r["kind"] == "action" and r["action"]["type"] == "draft_email"
+    return r["action"]
+
+
+def test_send_nothing_leaves_before_approval():
+    from app.mailer import TEST_SENT as SENT
+    a = _draft()
+    assert a["status"] == "pending" and SENT == []
+    as_("sara").post(f"/api/actions/{a['id']}/decide", json={"approve": False})     # rifiutata: non parte nulla
+    assert SENT == []
+
+
+def test_send_edit_keeps_pending_and_traces_original():
+    from app.mailer import TEST_SENT as SENT
+    a = _draft()
+    orig_body = a["payload"]["body"]
+    r = as_("giulia").post(f"/api/actions/{a['id']}/edit", json={"to": "luca.ferri@acmelogistica.example",
+                                                                  "subject": "Re: Termini di pagamento", "body": "Ciao Luca,\nTESTO MODIFICATO DA GIULIA\nGiulia"})
+    assert r.status_code == 200
+    e = r.json()
+    assert e["status"] == "pending" and e["edited_by"] == "Giulia Bianchi" and e["original"]["body"] == orig_body
+    assert "TESTO MODIFICATO" in e["payload"]["body"] and SENT == []
+
+
+def test_send_edit_validation_and_permissions():
+    a = _draft()
+    ok = {"to": "luca.ferri@acmelogistica.example", "subject": "Oggetto", "body": "Testo"}
+    for bad in ({**ok, "to": "non-una-mail"}, {**ok, "subject": "Oggetto\nBcc: spia@x.it"}, {**ok, "to": "a@b.it\r\nBcc: x@y.it"},
+                {**ok, "subject": ""}, {**ok, "body": "   "}, {**ok, "body": "x" * 10001}):
+        assert as_("giulia").post(f"/api/actions/{a['id']}/edit", json=bad).status_code == 400, bad
+    assert as_("marco").post(f"/api/actions/{a['id']}/edit", json=ok).status_code == 404       # Marco non vede la bozza di Finance
+    cd = ask("marco", "Sposta la scadenza della consegna Release 2 al 30/11")["action"]
+    assert as_("marco").post(f"/api/actions/{cd['id']}/edit", json=ok).status_code == 400      # solo bozze email
+
+
+def test_send_approved_draft_is_redirected_in_demo_mode():
+    from app.mailer import TEST_SENT as SENT
+    a = _draft()
+    as_("giulia").post(f"/api/actions/{a['id']}/edit", json={"to": "luca.ferri@acmelogistica.example", "subject": "Re: Pagamenti", "body": "VERSIONE DI GIULIA"})
+    d = as_("giulia").post(f"/api/actions/{a['id']}/decide", json={"approve": True})
+    assert d.status_code == 200 and d.json()["status"] == "approved" and "dirottata" in d.json()["result"]
+    assert len(SENT) == 1
+    m = SENT[0]
+    assert m["To"] == "demo-owner@test.invalid"                         # mai al destinatario reale
+    assert "luca.ferri@acmelogistica.example" in m["Subject"] and "VERSIONE DI GIULIA" in m.get_content()
+    assert m["From"].endswith("<agent@test.invalid>") and m["X-Company-Brain"] == "outbound"
+    assert as_("giulia").post(f"/api/actions/{a['id']}/decide", json={"approve": True}).status_code == 409   # niente doppio invio
+    assert len(SENT) == 1
+
+
+def test_send_failure_leaves_action_pending(monkeypatch):
+    from app import mailer
+    from app.mailer import TEST_SENT as SENT
+    a = _draft()
+    def boom(msg):
+        raise OSError("rete")
+    monkeypatch.setattr(mailer, "_deliver", boom)
+    r = as_("giulia").post(f"/api/actions/{a['id']}/decide", json={"approve": True})
+    assert r.status_code == 502
+    cur = next(x for x in as_("giulia").get("/api/actions").json() if x["id"] == a["id"])
+    assert cur["status"] == "pending" and cur["decided_by"] is None and SENT == []
+
+
+def test_send_redirect_without_target_sends_nothing(monkeypatch):
+    from app.mailer import TEST_SENT as SENT
+    monkeypatch.delenv("MAIL_REDIRECT_TO")
+    a = _draft()
+    r = as_("giulia").post(f"/api/actions/{a['id']}/decide", json={"approve": True})
+    assert r.status_code == 502 and SENT == []
+
+
+def test_send_real_mode_needs_env_and_refuses_reserved_domains(monkeypatch):
+    from app.mailer import TEST_SENT as SENT
+    monkeypatch.setenv("MAIL_MODE", "real")
+    a = _draft()                                                         # destinatario finto .example
+    assert as_("giulia").post(f"/api/actions/{a['id']}/decide", json={"approve": True}).status_code == 502 and SENT == []
+    as_("giulia").post(f"/api/actions/{a['id']}/edit", json={"to": "cliente@azienda.it", "subject": "S", "body": "T"})
+    assert as_("giulia").post(f"/api/actions/{a['id']}/decide", json={"approve": True}).status_code == 200
+    assert SENT[0]["To"] == "cliente@azienda.it" and "[DEMO" not in SENT[0]["Subject"]
+
+
+def test_send_rate_limit(monkeypatch):
+    from app import mailer
+    from app.mailer import TEST_SENT as SENT
+    mailer._SENT.extend([__import__("time").time()] * mailer.MAX_PER_HOUR)
+    a = _draft()
+    assert as_("giulia").post(f"/api/actions/{a['id']}/decide", json={"approve": True}).status_code == 502 and SENT == []
+
+
+def test_send_status_exposes_mode_but_not_credentials():
+    s = as_("giulia").get("/api/status").json()["mail"]
+    assert s["mode"] == "redirect" and s["redirect_to"] == "demo-owner@test.invalid" and "password" not in str(s).lower()
+
+
+def test_inbox_ignores_own_outbound_mail():
+    import email.message
+    from app import inbox
+    m = email.message.EmailMessage()
+    m["From"], m["X-Company-Brain"] = "Qualcuno <altro@x.it>", "outbound"
+    assert m.get("X-Company-Brain")                                       # il guard in imap_poll_once salta questi messaggi

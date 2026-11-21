@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import actions, auth, brief, data, events, inbox, llm, memory, qa, store
+from . import actions, auth, brief, data, events, inbox, llm, mailer, memory, qa, store
 from .auth import current_user
 from .config import NOW, STATIC_DIR
 from .permissions import acl_label, can_see
@@ -51,7 +51,7 @@ def api_me(user: dict = Depends(current_user)):
 # ------------------------------------------------------------- generale
 @app.get("/api/status")
 def api_status(u: dict = Depends(current_user)):
-    return {"llm": llm.status(), "imap": inbox.imap_status(), "now": NOW.isoformat(timespec="minutes"),
+    return {"llm": llm.status(), "imap": inbox.imap_status(), "mail": mailer.status(), "now": NOW.isoformat(timespec="minutes"),
             "badges": {"candidates": len(memory.facts_for(u["role"], "candidate")),
                        "pending": sum(1 for a in actions.visible_actions(u["role"]) if a["status"] == "pending" and u["role"] in a["approvers"])}}
 
@@ -141,6 +141,26 @@ def api_decide(aid: str, b: DecideBody, u: dict = Depends(current_user)):
         raise HTTPException(403, str(e))
     except ValueError as e:
         raise HTTPException(409, str(e))
+    except RuntimeError as e:                       # invio email non riuscito: l'azione resta in attesa
+        raise HTTPException(502, str(e))
+
+
+class EditBody(BaseModel):
+    to: str
+    subject: str
+    body: str
+
+
+@app.post("/api/actions/{aid}/edit")
+def api_edit(aid: str, b: EditBody, u: dict = Depends(current_user)):
+    try:
+        return actions.edit_draft(aid, u["role"], u["name"], b.to, b.subject, b.body)
+    except LookupError:
+        raise HTTPException(404, "azione non trovata")
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 class ProposeBody(BaseModel):
