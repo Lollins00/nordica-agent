@@ -160,15 +160,59 @@ def test_4_conflicting_sources_are_reported():
 
 
 # 5 ------------------------------------------------------------------ non lo so
-def test_5_unknown_when_no_data_and_llm_not_called(monkeypatch):
+def test_5_unknown_when_no_data_and_llm_never_sees_data(monkeypatch):
+    """Per un «non lo so» Gemini può al massimo riformulare la DOMANDA: non vede fatti e non scrive la risposta."""
     llm.set_offline(False)
     monkeypatch.setattr(llm, "api_key", lambda: "x")
-    calls = []
-    monkeypatch.setattr(llm, "generate_json", lambda *a, **k: calls.append(1))
-    for q in ["Quanto costa la mensa aziendale?", "Che tempo fa domani a Milano?", "Chi ha vinto il campionato?"]:
+    prompts = []
+    monkeypatch.setattr(llm, "generate_json", lambda prompt, system=None: prompts.append(prompt) or None)
+    for q in ["Quanto costa la mensa aziendale?", "Che tempo fa domani a Milano?", "Chi ha vinto il campionato?", "Quanti dipendenti abbiamo?"]:
         r = ask("sara", q)
         assert r["kind"] == "unknown" and r["text"].startswith("Non lo so") and not r["citations"]
-    assert calls == []
+    joined = " ".join(prompts)
+    assert "FATTI APPROVATI" not in joined and "22%" not in joined and "migrazione" not in joined
+
+
+QUESTIONS_WITH_DATA = [
+    ("giulia", "Qual è il margine su Acme?"), ("giulia", "Che margine facciamo con Acme?"),
+    ("giulia", "Quanto guadagniamo sul progetto Acme?"), ("giulia", "Margine Acme?"),
+    ("giulia", "Qual è la marginalità prevista sul progetto?"),
+    ("marco", "Perché è andato giù il database il 12 novembre?"), ("marco", "Cosa ha causato l'incidente?"),
+    ("marco", "Com'è nato il problema del 12/11?"),
+    ("sara", "Quando dobbiamo consegnare ad Acme?"), ("sara", "Entro quando va consegnata la release?"),
+    ("sara", "Qual è la scadenza della Release 2?"), ("sara", "Quanti giorni di preavviso servono per le ferie?"),
+    ("sara", "Con quanto anticipo vanno chieste le ferie?"),
+]
+
+
+@pytest.mark.parametrize("user,q", QUESTIONS_WITH_DATA)
+def test_5_rephrased_questions_with_data_never_get_unknown_even_offline(user, q):
+    r = ask(user, q)
+    assert r["kind"] == "answer" and r["citations"], q
+
+
+def test_5_gemini_rephrasing_finds_facts_but_permissions_and_threshold_still_hold(monkeypatch):
+    llm.set_offline(False)
+    monkeypatch.setattr(llm, "api_key", lambda: "x")
+    concepts = {"ricarico": {"concepts": [{"terms": ["ricarico", "margine", "markup"], "essential": True}, {"terms": ["acme"], "essential": False}]},
+                "mensa": {"concepts": [{"terms": ["mensa", "ristorazione"], "essential": True}, {"terms": ["costo", "prezzo"], "essential": False}]},
+                "tempo": {"concepts": [{"terms": ["tempo", "meteo", "previsioni"], "essential": True}, {"terms": ["domani"], "essential": False}]},
+                "Beta": {"concepts": [{"terms": ["margine", "guadagno"], "essential": True}, {"terms": ["progetto"], "essential": False}]}}
+    seen = []
+
+    def fake(prompt, system=None):
+        seen.append(prompt)
+        if "FATTI APPROVATI" in prompt:
+            return None                                   # risposta: fallback deterministico
+        return next((v for k, v in concepts.items() if k in prompt), None)
+    monkeypatch.setattr(llm, "generate_json", fake)
+    r = ask("giulia", "Di quanto è il nostro ricarico su Acme?")          # «ricarico» non è nel lessico
+    assert r["kind"] == "answer" and r["citations"][0]["fact_id"] == "F-ECON-MARGIN" and r["debug"]["expanded"]
+    assert ask("marco", "Di quanto è il nostro ricarico su Acme?")["kind"] == "unknown"     # permessi intatti
+    assert ask("sara", "Quanto costa la mensa aziendale?")["kind"] == "unknown"             # soglia intatta
+    assert ask("giulia", "Qual è il margine sul progetto Beta?")["kind"] == "unknown"        # nome proprio assente: altra cosa
+    assert ask("giulia", "Che tempo farà domani?")["kind"] == "unknown"                       # «previsioni» non è «previsto»
+    assert not any("22%" in p for p in seen if "FATTI APPROVATI" not in p)                  # la riformulazione non vede dati
 
 
 # 6 ------------------------------------------------------------------ azioni in attesa

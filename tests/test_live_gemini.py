@@ -37,3 +37,11 @@ def test_live_draft_has_no_confidential_numbers():
     p = actions.propose_from_text("finance", "Giulia", "Scrivi una bozza di email ad Acme per la richiesta di demo")
     body = p["action"]["payload"]["body"]
     assert p["action"]["status"] == "pending" and "22%" not in body and "140.400" not in body
+
+
+def test_live_gemini_rephrasing_unusual_wording():
+    """Parola fuori dal lessico: senza la riformulazione di Gemini sarebbe «non lo so»."""
+    r = qa.answer("finance", "Di quanto è il nostro ricarico su Acme?")
+    assert r["kind"] == "answer" and r["citations"][0]["fact_id"] == "F-ECON-MARGIN", (r["debug"], llm.status())
+    assert qa.answer("tech", "Di quanto è il nostro ricarico su Acme?")["kind"] == "unknown"
+    assert qa.answer("ceo", "Quanto costa la mensa aziendale?")["kind"] == "unknown"
