@@ -2,7 +2,7 @@
 import threading
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -259,4 +259,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    """Pagina con versione (mtime) sui file statici: dopo ogni modifica il browser non resta con un JS vecchio in cache."""
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    for f in ("app.js", "app.css"):
+        html = html.replace(f"/static/{f}", f"/static/{f}?v={int((STATIC_DIR / f).stat().st_mtime)}")
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})

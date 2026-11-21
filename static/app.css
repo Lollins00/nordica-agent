@@ -181,3 +181,5 @@ textarea{resize:vertical;min-height:90px}
 :root[data-theme="dark"] .banner.demo{background:#10283d;border-color:#1c4a73;color:#8ec9ff}
 :root[data-theme="dark"] .banner.real{background:#3d3208;border-color:#6b5a10;color:#ffd866}
 .action-card textarea{min-height:180px;font:inherit;line-height:1.5}
+
+.card.stale{border-style:dashed;opacity:.8}

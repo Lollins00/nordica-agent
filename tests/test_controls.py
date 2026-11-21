@@ -399,3 +399,13 @@ def test_inbox_ignores_own_outbound_mail():
     m = email.message.EmailMessage()
     m["From"], m["X-Company-Brain"] = "Qualcuno <altro@x.it>", "outbound"
     assert m.get("X-Company-Brain")                                       # il guard in imap_poll_once salta questi messaggi
+
+
+def test_ids_are_not_reused_after_reset_so_stale_pages_cannot_hit_other_actions():
+    first = _draft()
+    store.reset()
+    second = _draft()
+    assert second["id"] != first["id"]
+    ok = {"to": "a@azienda.it", "subject": "S", "body": "T"}
+    assert as_("giulia").post(f"/api/actions/{first['id']}/edit", json=ok).status_code == 404   # la vecchia card non tocca la nuova bozza
+    assert as_("giulia").post(f"/api/actions/{first['id']}/decide", json={"approve": True}).status_code == 404

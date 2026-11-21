@@ -49,8 +49,10 @@ def reset() -> None:
     global _state
     with _lock:
         seen = list(get()["imap_seen"])   # le email già lette non si rileggono dopo un reset
+        counters = dict(get()["counters"])  # gli ID non ripartono da 1: una pagina rimasta aperta non può colpire un'azione diversa
         _state = _default()
         _state["imap_seen"] = seen
+        _state["counters"] = counters
         save()
 
 

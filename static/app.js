@@ -9,7 +9,7 @@ async function api(path, opts = {}) {
     body: opts.body ? JSON.stringify(opts.body) : undefined });
   let j = null; try { j = await r.json(); } catch (e) { /* no body */ }
   if (r.status === 401 && path !== '/api/login') { showLogin('Sessione scaduta: accedi di nuovo'); throw new Error('Sessione scaduta'); }
-  if (!r.ok) throw new Error((j && j.detail) || `Errore ${r.status}`);
+  if (!r.ok) { const err = new Error((j && j.detail) || `Errore ${r.status}`); err.status = r.status; throw err; }
   return j;
 }
 
@@ -91,6 +91,12 @@ function actionCard(a) {
   </div>`;
 }
 
+const STALE = 'Questa azione non esiste più (demo ripristinata o server riavviato). Ricarica la pagina.';
+function markStale(id) {
+  $$(`.action-card[data-aid="${id}"]`).forEach(c => { c.outerHTML = `<div class="card stale"><b>⚠️ Azione non più disponibile</b><div class="meta">${esc(STALE)}</div></div>`; });
+  toast(STALE, 'bad'); refreshStatus();
+}
+
 const replaceCards = a => $$(`.action-card[data-aid="${a.id}"]`).forEach(c => { c.outerHTML = actionCard(a); });
 
 async function decideAction(id, approve, btn) {
@@ -100,7 +106,7 @@ async function decideAction(id, approve, btn) {
     replaceCards(a);
     toast(a.status === 'approved' ? '✓ ' + a.result : 'Rifiutata: nessuna modifica', a.status === 'approved' ? 'ok' : '');
     S.brief = {}; refreshStatus(); if (S.view === 'actions') renderActions();
-  } catch (err) { toast(err.message, 'bad'); if (btn) btn.disabled = false; }
+  } catch (err) { if (err.status === 404) markStale(id); else toast(err.message, 'bad'); if (btn) btn.disabled = false; }
 }
 
 function openSendConfirm(a) {
@@ -137,7 +143,7 @@ function startEdit(id) {
     try {
       const upd = await api(`/api/actions/${id}/edit`, { method: 'POST', body: { to: $('[name=to]', card).value, subject: $('[name=subject]', card).value, body: $('[name=body]', card).value } });
       replaceCards(upd); toast('Bozza salvata (ancora in attesa)', 'ok');
-    } catch (err) { toast(err.message, 'bad'); ev.target.disabled = false; }
+    } catch (err) { if (err.status === 404) markStale(id); else { toast(err.message, 'bad'); ev.target.disabled = false; } }
   };
   $('[name=body]', card).focus();
 }
