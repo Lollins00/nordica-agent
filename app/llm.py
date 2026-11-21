@@ -6,6 +6,7 @@ import re
 import time
 
 import requests
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout, as_completed
 
 BASE = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
 
@@ -17,9 +18,11 @@ def api_key() -> str | None:
 
 
 def models() -> list[str]:
-    first = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    # Ordine scelto con prove dal vivo: i modelli "lite" e 3-flash-preview rispondono, i flash pieni
+    # (3.8/3.7/3.6/3.5) davano 503 "high demand". gemini-2.5-* non è più disponibile ai nuovi utenti (404).
+    first = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     out = []
-    for m in (first, "gemini-3.5-flash", "gemini-flash-latest"):
+    for m in (first, "gemini-3-flash-preview", "gemini-flash-lite-latest", "gemini-3.8-flash"):
         if m not in out:
             out.append(m)
     return out
@@ -51,8 +54,34 @@ def _post(model: str, body: dict, timeout: float) -> requests.Response:
                          json=body, timeout=timeout)
 
 
+def _one(model: str, body: dict, timeout: float) -> str | None:
+    """Una chiamata a un modello. Torna il testo o None; registra l'ultimo errore. Non solleva."""
+    try:
+        r = _post(model, body, timeout=(4, timeout))
+    except requests.ConnectionError as e:
+        _status["last_error"] = f"rete non raggiungibile ({type(e).__name__})"
+        return None
+    except requests.Timeout:
+        _status["last_error"] = f"timeout su {model}"
+        return None
+    if r.status_code != 200:
+        _status["last_error"] = f"{model}: HTTP {r.status_code}"
+        return None
+    try:
+        parts = r.json()["candidates"][0]["content"]["parts"]
+        text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+    except (KeyError, IndexError, ValueError):
+        _status["last_error"] = f"{model}: risposta non valida"
+        return None
+    if text:
+        _status["model"] = model
+    return text or None
+
+
 def generate(prompt: str, system: str | None = None, json_mode: bool = False, max_tokens: int = 2048) -> str | None:
-    """Testo generato o None (offline, errore, risposta vuota). Non solleva mai."""
+    """Testo generato o None (offline, errore, risposta vuota). Non solleva mai.
+    Chiama in parallelo (hedging) i primi modelli e prende la prima risposta valida: i modelli di Gemini
+    vanno spesso in 503 'high demand' o rallentano, e così la demo non aspetta il più lento."""
     if _status["forced_offline"] or not api_key() or time.time() < _status["down_until"]:
         return None
     body: dict = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -61,32 +90,23 @@ def generate(prompt: str, system: str | None = None, json_mode: bool = False, ma
         body["systemInstruction"] = {"parts": [{"text": system}]}
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
-    deadline = time.time() + 9
-    for i, model in enumerate(models()[:3]):
-        remaining = deadline - time.time()
-        if remaining < 3:
-            break
-        try:
-            r = _post(model, body, timeout=min(7 if i == 0 else 4, remaining))
-        except requests.ConnectionError as e:   # niente rete: inutile riprovare, apro il circuito per 60s
-            _status.update(last_ok=False, last_error=f"rete non raggiungibile ({type(e).__name__})",
-                           down_until=time.time() + 60)
-            return None
-        except requests.Timeout:   # Gemini non risponde: non faccio aspettare la demo, circuito aperto per 90s
-            _status.update(last_ok=False, last_error=f"timeout su {model}", down_until=time.time() + 90)
-            return None
-        if r.status_code != 200:
-            _status.update(last_ok=False, last_error=f"{model}: HTTP {r.status_code}")
-            continue
-        try:
-            parts = r.json()["candidates"][0]["content"]["parts"]
-            text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-        except (KeyError, IndexError, ValueError):
-            _status.update(last_ok=False, last_error=f"{model}: risposta non valida")
-            continue
-        if text:
-            _status.update(last_ok=True, model=model, last_error=None)
-            return text
+    ms = models()[:3]
+    ex = ThreadPoolExecutor(len(ms))
+    futs = [ex.submit(_one, m, body, 14) for m in ms]
+    text = None
+    try:
+        for f in as_completed(futs, timeout=16):
+            text = f.result()
+            if text:
+                break
+    except FuturesTimeout:
+        _status["last_error"] = "nessun modello ha risposto in tempo"
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+    if text:
+        _status.update(last_ok=True, last_error=None)
+        return text
+    _status.update(last_ok=False, down_until=time.time() + 45)   # tutti falliti: fallback subito per 45s
     return None
 
 

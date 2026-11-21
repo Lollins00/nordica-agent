@@ -26,7 +26,7 @@ SYN_GROUPS = [
     ("consegna", {"consegna", "consegnare", "consegnata", "rilascio", "rilasciare", "deliver", "delivery", "chiusura", "chiudere", "chiudiamo"}),
     ("margine", {"margine", "margini", "marginalita", "guadagno", "guadagni", "profitto", "profitti", "utile", "ricavo"}),
     ("pagamento", {"pagamento", "pagamenti", "pagare", "pagato", "incasso", "incassi", "incassato", "incassare", "paga"}),
-    ("incidente", {"incidente", "guasto", "outage", "downtime", "blocco", "crash", "successo", "accaduto"}),
+    ("incidente", {"incidente", "guasto", "outage", "downtime", "blocco", "crash", "successo", "accaduto", "durato", "durata"}),
     ("budget", {"budget", "stanziato", "stanziamento", "stanziare", "fondi"}),
     ("ferie", {"ferie", "vacanza", "vacanze", "assenza", "assente"}),
     ("penale", {"penale", "penali", "sanzione", "sanzioni", "mora"}),
