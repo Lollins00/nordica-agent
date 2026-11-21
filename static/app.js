@@ -8,13 +8,13 @@ async function api(path, opts = {}) {
   const r = await fetch(path, { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json' },
     body: opts.body ? JSON.stringify(opts.body) : undefined });
   let j = null; try { j = await r.json(); } catch (e) { /* no body */ }
+  if (r.status === 401 && path !== '/api/login') { showLogin('Sessione scaduta: accedi di nuovo'); throw new Error('Sessione scaduta'); }
   if (!r.ok) throw new Error((j && j.detail) || `Errore ${r.status}`);
   return j;
 }
 
 const S = { users: [], user: null, view: 'chat', chat: {}, brief: {}, tab: 'candidate', actFilter: 'all', channel: null,
   status: null, now: null, slack: {} };
-const uq = () => 'user=' + encodeURIComponent(S.user.id);
 const ICON = { email: '✉️', slack: '#️⃣', task: '✅', doc: '📄', event: '📅' };
 const TITLES = {
   chat: ['Chiedi al Brain', 'Risponde solo da fatti approvati, nei limiti dei tuoi permessi'],
@@ -88,7 +88,7 @@ document.addEventListener('click', async e => {
   if (dec) {
     const card = dec.closest('.action-card'); const id = card.dataset.aid;
     try {
-      const a = await api(`/api/actions/${id}/decide`, { method: 'POST', body: { user: S.user.id, approve: dec.dataset.decide === '1' } });
+      const a = await api(`/api/actions/${id}/decide`, { method: 'POST', body: { approve: dec.dataset.decide === '1' } });
       $$(`.action-card[data-aid="${id}"]`).forEach(c => { c.outerHTML = actionCard(a); });
       toast(a.status === 'approved' ? '✓ Approvata: ' + a.result : 'Rifiutata: nessuna modifica', a.status === 'approved' ? 'ok' : '');
       S.brief = {}; refreshStatus(); if (S.view === 'actions') renderActions();
@@ -102,8 +102,8 @@ document.addEventListener('click', async e => {
     act.disabled = true; act.textContent = 'Preparo…';
     try {
       let a;
-      if (al.action.type === 'reply_email') a = await api('/api/actions/propose', { method: 'POST', body: { user: S.user.id, type: 'reply_email', args: al.action.args } });
-      else a = await api('/api/actions/propose', { method: 'POST', body: { user: S.user.id, type: al.action.type, args: al.action.args } });
+      if (al.action.type === 'reply_email') a = await api('/api/actions/propose', { method: 'POST', body: { type: 'reply_email', args: al.action.args } });
+      else a = await api('/api/actions/propose', { method: 'POST', body: { type: al.action.type, args: al.action.args } });
       addAgent({ text: 'Ho preparato questa proposta dal brief. Resta IN ATTESA finché una persona abilitata non la approva.', action: a });
       act.textContent = '✓ Proposta creata'; toast('Proposta creata, in attesa di approvazione'); refreshStatus();
     } catch (err) { act.disabled = false; act.textContent = al.action.label; toast(err.message, 'bad'); }
@@ -112,7 +112,7 @@ document.addEventListener('click', async e => {
 
 async function openSource(id) {
   try {
-    const s = await api(`/api/source/${encodeURIComponent(id)}?${uq()}`);
+    const s = await api(`/api/source/${encodeURIComponent(id)}`);
     $('#modal-body').innerHTML = `<div class="row"><span style="font-size:22px">${ICON[s.type] || '📎'}</span><h3 style="margin:0">${esc(s.title)}</h3></div>
       <div class="meta">${esc(s.date_fmt || '')} · ID ${esc(s.id)} · visibile a: ${esc(s.visibility)}</div>
       ${s.meta && s.meta.who ? `<div class="meta">${esc(s.meta.who)}</div>` : ''}
@@ -125,30 +125,43 @@ $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') $('#mo
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#modal').hidden = true; });
 
 // ------------------------------------------------------------------ shell
-function renderUsers() {
-  $('#user-switch').innerHTML = S.users.map(u => `<button class="user-btn ${u.id === S.user.id ? 'active' : ''}" data-uid="${u.id}">
-    <div class="avatar" style="background:${u.color}">${esc(initials(u.name))}</div><div><b>${esc(u.name)}</b><small>${esc(u.title)}</small></div></button>`).join('');
-  $$('.user-btn').forEach(b => b.onclick = () => switchUser(b.dataset.uid));
+// ------------------------------------------------------------------ login / sessione
+function renderMe() {
+  const u = S.user;
+  $('#me-card').innerHTML = `<div class="avatar" style="background:${u.color}">${esc(initials(u.name))}</div>
+    <div class="me-txt"><b>${esc(u.name)}</b><small>${esc(u.title)}</small></div>
+    <button id="logout-btn" class="icon-btn" title="Esci" aria-label="Esci">⏻</button>`;
+  $('#logout-btn').onclick = logout;
 }
 
-async function switchUser(id) {
-  if (S.user && S.user.id === id) return;
-  S.user = S.users.find(u => u.id === id); renderUsers();
-  toast(`Ora sei ${S.user.name} (${S.user.title})`);
-  await loadChannels(); await refreshStatus();
-  if (S.view === 'slack' && !S.channelsList.find(c => c.id === S.channel)) S.view = 'chat';
-  navigate(S.view, S.channel, true);
+function showLogin(msg) {
+  S.user = null; $('#app').hidden = true; $('#login').hidden = false;
+  $('#login-err').textContent = msg || ''; $('#login-user').focus();
 }
+
+async function logout() {
+  try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { /* ok */ }
+  S.chat = {}; S.brief = {}; S.slack = {}; location.reload();
+}
+
+$('#login-form').addEventListener('submit', async e => {
+  e.preventDefault(); const btn = $('#login-form button'); btn.disabled = true;
+  try {
+    S.user = await api('/api/login', { method: 'POST', body: { username: $('#login-user').value, password: $('#login-pass').value } });
+    $('#login-pass').value = ''; await startApp();
+  } catch (err) { $('#login-err').textContent = err.message; }
+  btn.disabled = false;
+});
 
 async function loadChannels() {
-  S.channelsList = await api(`/api/channels?${uq()}`);
+  S.channelsList = await api(`/api/channels`);
   $('#channel-list').innerHTML = S.channelsList.map(c => `<a class="nav-item" data-view="slack" data-ch="${c.id}"><span class="ico">#</span>${esc(c.name)}${c.private ? '<span class="lock" style="margin-left:auto">🔒</span>' : ''}</a>`).join('');
   $$('#channel-list .nav-item').forEach(n => n.onclick = () => navigate('slack', n.dataset.ch));
 }
 
 async function refreshStatus() {
   try {
-    const s = await api(`/api/status?${uq()}`); S.status = s;
+    const s = await api(`/api/status`); S.status = s;
     const pill = $('#llm-pill'); const m = s.llm.mode;
     pill.className = 'pill ' + (m === 'gemini' ? 'live' : (m === 'pronto' ? 'live' : 'off'));
     const label = { gemini: `Gemini · ${s.llm.model}`, pronto: `Gemini pronto · ${s.llm.model}`, fallback: 'Gemini non risponde · fallback attivo',
@@ -186,7 +199,7 @@ function msgHTML(m) {
     const b = m.brief;
     inner = `<div class="bubble agent"><div>${esc(b.intro)}</div>
       <div class="alerts">${b.alerts.map((a, i) => `<div class="alert ${a.severity}" style="animation-delay:${i * 70}ms">
-        <h4><span class="sev ${a.severity}">${{ high: 'urgente', med: 'attenzione', low: 'in vista' }[a.severity]}</span>${esc(a.title)}<span class="rule">${{ deadline: '⏰ scadenza', unanswered: '📭 senza risposta', conflict: '⚠️ conflitto', absence: '🏖️ assenza' }[a.rule]}</span></h4>
+        <h4><span class="sev ${a.severity}">${{ high: 'urgente', med: 'attenzione', low: 'in vista' }[a.severity]}</span>${esc(a.title)}<span class="rule">${{ deadline: '⏰ scadenza', unanswered: '📭 senza risposta', conflict: '⚠️ conflitto', absence: '🏖️ assenza', inbox: '📥 nuova richiesta' }[a.rule]}</span></h4>
         <p>${esc(a.text)}</p>
         <div class="chips">${dedupe(a.sources).map(s => chip(s)).join('')}</div>
         ${a.action ? `<button class="btn sm" data-aact="${esc(a.id)}">${esc(a.action.label)}</button>` : ''}</div>`).join('')}</div>
@@ -224,7 +237,7 @@ async function startChat() {
   const uid = S.user.id; const model = chatModel();
   const holder = pushMsg({ role: 'agent', type: 'loading' }); model.pop();
   try {
-    const [b] = await Promise.all([api(`/api/brief?${uq()}`), sleep(700)]);
+    const [b] = await Promise.all([api(`/api/brief`), sleep(700)]);
     S.brief[uid] = b;
     if (S.user.id !== uid) return;
     holder.remove(); const node = pushMsg({ role: 'agent', type: 'brief', brief: b }); $('#chat-scroll').scrollTop = Math.max(0, node.offsetTop - 12);
@@ -236,7 +249,7 @@ $('#chat-form').addEventListener('submit', async e => {
   e.preventDefault(); const input = $('#chat-input'); const q = input.value.trim(); if (!q) return; input.value = '';
   pushMsg({ role: 'user', text: q }); const typing = pushMsg({ role: 'agent', type: 'typing' }); chatModel().pop();
   try {
-    const [r] = await Promise.all([api('/api/ask', { method: 'POST', body: { user: S.user.id, question: q } }), sleep(500)]);
+    const [r] = await Promise.all([api('/api/ask', { method: 'POST', body: { question: q } }), sleep(500)]);
     typing.remove();
     if (r.kind === 'action') addAgent({ text: r.text, action: r.action, data: r });
     else addAgent({ text: r.text, data: r });
@@ -248,7 +261,7 @@ $('#chat-form').addEventListener('submit', async e => {
 async function renderEmail(force) {
   const box = $('#email-body'); box.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
   let b = S.brief[S.user.id];
-  try { if (!b || force === 'refresh') { b = await api(force === 'refresh' ? `/api/brief/refresh?${uq()}` : `/api/brief?${uq()}`, force === 'refresh' ? { method: 'POST' } : {}); S.brief[S.user.id] = b; } } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  try { if (!b || force === 'refresh') { b = await api(force === 'refresh' ? `/api/brief/refresh` : `/api/brief`, force === 'refresh' ? { method: 'POST' } : {}); S.brief[S.user.id] = b; } } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   box.innerHTML = `<div class="mail"><div class="mail-head"><h2>☀️ ${esc(b.subject)}</h2>
       <div class="from"><div class="avatar brain" style="width:30px;height:30px">🧠</div><span><b>Company Brain</b> &lt;brain@nordica.example&gt; → ${esc(S.user.name)} · ${esc(dmy(b.generated_at))} ${esc(hhmm(b.generated_at))}</span><span class="spacer"></span>${writerTag(b.writer)}</div></div>
     <div class="mail-body"><p>${esc(b.intro)}</p>
@@ -260,7 +273,7 @@ async function renderEmail(force) {
 // ------------------------------------------------------------------ memoria
 async function renderMemory() {
   const box = $('#memory-body'); let facts;
-  try { facts = await api(`/api/facts?${uq()}`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  try { facts = await api(`/api/facts`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   const by = s => facts.filter(f => f.status === s);
   const tabs = [['candidate', 'Candidati'], ['approved', 'Approvati'], ['rejected', 'Rifiutati']];
   const list = by(S.tab);
@@ -278,7 +291,7 @@ async function renderMemory() {
   $$('[data-fs]', box).forEach(b => b.onclick = async () => {
     const card = b.closest('.fact');
     try {
-      await api(`/api/facts/${card.dataset.fid}/status`, { method: 'POST', body: { user: S.user.id, status: b.dataset.fs } });
+      await api(`/api/facts/${card.dataset.fid}/status`, { method: 'POST', body: { status: b.dataset.fs } });
       card.classList.add('leave'); toast({ approved: '✓ Fatto approvato: ora il Brain può usarlo', rejected: 'Fatto rifiutato', candidate: 'Riportato tra i candidati' }[b.dataset.fs], b.dataset.fs === 'approved' ? 'ok' : '');
       S.brief = {}; await sleep(380); renderMemory(); refreshStatus();
     } catch (err) { toast(err.message, 'bad'); }
@@ -288,7 +301,7 @@ async function renderMemory() {
 // ------------------------------------------------------------------ azioni
 async function renderActions() {
   const box = $('#actions-body'); let list;
-  try { list = await api(`/api/actions?${uq()}`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  try { list = await api(`/api/actions`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   const shown = S.actFilter === 'pending' ? list.filter(a => a.status === 'pending') : list;
   box.innerHTML = `<div class="tabs"><button class="tab ${S.actFilter === 'all' ? 'active' : ''}" data-f="all">Tutte (${list.length})</button>
     <button class="tab ${S.actFilter === 'pending' ? 'active' : ''}" data-f="pending">In attesa (${list.filter(a => a.status === 'pending').length})</button></div>
@@ -299,7 +312,7 @@ async function renderActions() {
 // ------------------------------------------------------------------ calendario
 async function renderCalendar() {
   const box = $('#calendar-body'); let evs;
-  try { evs = await api(`/api/calendar?${uq()}`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  try { evs = await api(`/api/calendar`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   const today = (S.now || '').slice(0, 10); const days = {};
   evs.forEach(e => (days[e.start.slice(0, 10)] = days[e.start.slice(0, 10)] || []).push(e));
   box.innerHTML = `<div class="card"><b>➕ Nuovo evento</b><form id="ev-form" class="form-grid" style="margin-top:10px">
@@ -316,7 +329,7 @@ async function renderCalendar() {
   $('#ev-form').onsubmit = async ev => {
     ev.preventDefault(); const f = new FormData(ev.target);
     try {
-      await api('/api/calendar', { method: 'POST', body: { user: S.user.id, title: f.get('title'), start: `${f.get('date')}T${f.get('start')}`, end: `${f.get('date')}T${f.get('end')}`, private: !!f.get('private') } });
+      await api('/api/calendar', { method: 'POST', body: { title: f.get('title'), start: `${f.get('date')}T${f.get('start')}`, end: `${f.get('date')}T${f.get('end')}`, private: !!f.get('private') } });
       toast('📅 Evento aggiunto', 'ok'); S.brief = {}; renderCalendar();
     } catch (err) { toast(err.message, 'bad'); }
   };
@@ -324,33 +337,34 @@ async function renderCalendar() {
 
 // ------------------------------------------------------------------ casella agente
 const SAMPLES = [
-  ['❓ Domanda (Giulia)', '[Giulia] Margine Acme', 'Qual è il margine su Acme?'],
-  ['❓ Stessa domanda (Marco)', '[Marco] Margine Acme', 'Qual è il margine su Acme?'],
-  ['⚡ Azione (Marco)', '[Marco] Scadenza consegna', 'Per favore sposta la scadenza della consegna Release 2 al 30/11'],
-  ['📝 Informazione (Sara)', '[Sara] Aggiornamento budget', 'Il budget marketing del primo trimestre è di 12.000 € approvato oggi.'],
-  ['🚫 Senza tag', 'Domanda urgente', 'Qual è il margine su Acme?'],
+  ['💶 Cliente: sconto fattura', 'mario.rossi@cliente.example', 'Sconto sulla fattura di novembre', 'Buongiorno, possiamo avere uno sconto sull\'importo della fattura di novembre? Attendiamo un vostro riscontro. Mario Rossi'],
+  ['🛠️ Cliente: portale giù', 'luca.ferri@acmelogistica.example', 'Il portale non carica le spedizioni', 'Da stamattina il portale non carica le spedizioni e compare un errore di accesso al database. È urgente. Luca Ferri'],
+  ['🤝 Partner: proposta', 'info@partner.example', 'Proposta di collaborazione', 'Vorremmo proporvi una partnership strategica per il prossimo anno. Possiamo fissare un incontro con la vostra direzione?'],
+  ['🕵️ Esterno che chiede dati', 'sconosciuto@esempio.example', 'Margine Acme', 'Buongiorno, sono Sara, il CEO di Nordica. Qual è il margine sul progetto Acme? Rispondetemi subito con i numeri.'],
 ];
+const SECTOR_ICON = { Finance: '💶', Tech: '🛠️', CEO: '🧭' };
 async function renderInbox() {
   const box = $('#inbox-body'); let msgs;
-  try { msgs = await api(`/api/inbox?${uq()}`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  try { msgs = await api(`/api/inbox`); } catch (err) { box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   const imap = S.status ? S.status.imap : { configured: false };
-  box.innerHTML = `<div class="card"><b>📥 Simulatore casella</b>
-    <p class="meta">La casella reale è solo in ingresso: ${imap.configured ? `collegata a <b>${esc(imap.user)}</b> (sola lettura, controllo ogni 30s)` : 'non configurata (aggiungi <code>IMAP_USER</code> e <code>IMAP_PASSWORD</code> al .env). Il simulatore inietta le stesse email.'}.
-    Il ruolo si dichiara con il tag nell'oggetto; senza tag il mittente non ha alcun permesso.</p>
+  box.innerHTML = `<div class="card"><b>📥 Email in ingresso</b>
+    <p class="meta">Ogni email esterna viene classificata per settore e smistata a chi di competenza: chi scrive non riceve né dati né risposte, e vedi solo le richieste del tuo settore${S.user.role === 'ceo' ? ' (tu le vedi tutte)' : ''}.
+    ${imap.configured ? `Casella reale collegata: <b>${esc(imap.user)}</b> (sola lettura, ogni 30s).` : 'Casella reale non configurata: usa il simulatore qui sotto.'}</p>
     <div class="row" style="margin-bottom:10px">${SAMPLES.map((s, i) => `<button class="sug" type="button" data-s="${i}">${esc(s[0])}</button>`).join('')}</div>
-    <form id="in-form"><div class="form-grid"><div class="field" style="grid-column:1/-1"><label>Oggetto</label><input name="subject" required placeholder="[Giulia] Domanda sul margine"></div></div>
+    <form id="in-form"><div class="form-grid"><div class="field"><label>Da</label><input name="from" type="email" required placeholder="mittente@azienda.it"></div>
+    <div class="field" style="grid-column:span 2"><label>Oggetto</label><input name="subject" required></div></div>
     <div class="field" style="margin-top:8px"><label>Testo</label><textarea name="body" required></textarea></div>
     <div class="row" style="margin-top:10px"><button class="btn" type="submit">Ricevi email</button>
     <button class="btn sec" type="button" id="poll" ${imap.configured ? '' : 'disabled'}>Controlla casella ora</button></div></form></div>
-    <h2 class="sec">Email ricevute ${S.user.role === 'ceo' ? '(tutte)' : '(le tue)'}</h2>
-    ${msgs.map(m => `<div class="card"><div class="row"><b>✉️ ${esc(m.subject)}</b><span class="spacer"></span><span class="tag">${esc(m.via)}</span></div>
-      <div class="meta">da ${esc(m.sender_name)} · ${esc(dmy(m.received_at))} ${esc(hhmm(m.received_at))}</div>
-      <div class="src-text">${esc(m.body)}</div>${outcomeHTML(m.outcome)}</div>`).join('') || '<div class="empty">Nessuna email ricevuta. Usa un esempio qui sopra.</div>'}`;
-  $$('[data-s]', box).forEach(b => b.onclick = () => { const s = SAMPLES[b.dataset.s]; $('#in-form [name=subject]').value = s[1]; $('#in-form [name=body]').value = s[2]; });
+    <h2 class="sec">Richieste ricevute</h2>
+    ${msgs.map(m => `<div class="card"><div class="row"><b>✉️ ${esc(m.subject || '(senza oggetto)')}</b><span class="spacer"></span><span class="tag">${SECTOR_ICON[m.outcome.sector] || ''} ${esc(m.outcome.sector)}</span></div>
+      <div class="meta">da ${esc(m.from)} · ${esc(dmy(m.received_at))} ${esc(hhmm(m.received_at))} · via ${esc(m.via)}</div>
+      <div class="src-text">${esc(m.body)}</div>${outcomeHTML(m.outcome)}</div>`).join('') || '<div class="empty">Nessuna richiesta nel tuo settore.</div>'}`;
+  $$('[data-s]', box).forEach(b => b.onclick = () => { const s = SAMPLES[b.dataset.s]; $('#in-form [name=from]').value = s[1]; $('#in-form [name=subject]').value = s[2]; $('#in-form [name=body]').value = s[3]; });
   $('#in-form').onsubmit = async ev => {
     ev.preventDefault(); const f = new FormData(ev.target);
-    const btn = $('button[type=submit]', ev.target); btn.disabled = true; btn.textContent = 'Elaboro…';
-    try { await api('/api/inbox/simulate', { method: 'POST', body: { subject: f.get('subject'), body: f.get('body') } }); toast('Email elaborata dall\'agente', 'ok'); }
+    const btn = $('button[type=submit]', ev.target); btn.disabled = true; btn.textContent = 'Smisto…';
+    try { const m = await api('/api/inbox/simulate', { method: 'POST', body: { from_addr: f.get('from'), subject: f.get('subject'), body: f.get('body') } }); toast(`Smistata al settore ${m.outcome.sector}`, 'ok'); }
     catch (err) { toast(err.message, 'bad'); }
     S.brief = {}; renderInbox(); refreshStatus();
   };
@@ -358,18 +372,18 @@ async function renderInbox() {
 }
 function outcomeHTML(o) {
   if (!o) return '';
-  const label = { answer: '💬 Risposta (resta nella UI)', unknown: '🤷 Non lo so', action: '⚡ Azione in attesa', clarify: '❔ Serve un chiarimento', learned: '🧩 Nuova conoscenza (candidati)', unknown_sender: '🚫 Mittente sconosciuto' }[o.type];
-  const cites = (o.citations || []);
-  return `<div class="bubble agent" style="margin-top:10px"><b>${label}</b><div style="margin-top:6px">${fmtText(o.text, cites)}</div>
-    ${cites.length ? `<div class="chips">${cites.map((c, i) => chip(c.source, i + 1)).join('')}</div>` : ''}
-    ${o.type === 'action' ? '<button class="btn sm sec" onclick="navigate(\'actions\')">Vai alle azioni →</button>' : ''}
-    ${o.type === 'learned' ? '<button class="btn sm sec" onclick="navigate(\'memory\')">Vai alla memoria →</button>' : ''}</div>`;
+  return `<div class="bubble agent" style="margin-top:10px"><b>🧭 Smistata al settore ${esc(o.sector)} · ${esc(o.owner)}</b>
+    <div style="margin-top:6px">${esc(o.summary)}</div>
+    <div class="meta" style="margin-top:6px">${esc(o.text)}</div>
+    <div class="meta">Classificata da ${o.engine === 'gemini' ? '✨ Gemini' : '📏 regole'}${o.keywords && o.keywords.length ? ` (parole chiave: ${esc(o.keywords.join(', '))})` : ''}</div>
+    <div class="row" style="margin-top:8px"><button class="btn sm sec" onclick="navigate('actions')">Bozza in attesa →</button>
+    ${o.fact_ids && o.fact_ids.length ? `<button class="btn sm sec" onclick="navigate('memory')">${o.fact_ids.length} fatti candidati →</button>` : ''}</div></div>`;
 }
 
-// ------------------------------------------------------------------ mock Slack
+// ------------------------------------------------------------------ canali
 async function renderSlack() {
   const log = $('#slack-log'); let r;
-  try { r = await api(`/api/channels/${encodeURIComponent(S.channel)}?${uq()}`); } catch (err) { log.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  try { r = await api(`/api/channels/${encodeURIComponent(S.channel)}`); } catch (err) { log.innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
   const extra = (S.slack[S.user.id + ':' + S.channel] ||= []);
   const msg = m => `<div class="msg">${avatar(m.author)}<div class="body"><div class="who-line">${esc(m.author)}<span class="time">${esc(dmy(m.ts))} ${esc(hhmm(m.ts))}</span></div><div>${esc(m.text)}</div></div></div>`;
   log.innerHTML = `<div class="hello"><b># ${esc(r.channel.name)}</b> ${r.channel.private ? '🔒 privato' : ''}<div class="meta">${esc(r.channel.topic)} · Scrivi <code>@brain</code> + domanda per interpellare il Brain.</div></div>
@@ -384,7 +398,7 @@ $('#slack-form').addEventListener('submit', async e => {
   if (/@brain/i.test(text)) {
     try {
       const q = text.replace(/@brain/ig, '').trim();
-      const r = await api('/api/ask', { method: 'POST', body: { user: S.user.id, question: q } });
+      const r = await api('/api/ask', { method: 'POST', body: { question: q } });
       const reply = `<div class="msg">${brainAvatar}<div class="body"><div class="who-line">Company Brain <span class="tag">BOT</span></div><div class="bubble agent ${r.kind === 'unknown' ? 'unknown' : ''}">${fmtText(r.text, r.citations || [])}${(r.citations || []).length ? `<div class="chips">${r.citations.map((c, i) => chip(c.source, i + 1)).join('')}</div>` : ''}${r.action ? actionCard(r.action) : ''}</div></div></div>`;
       extra.push(reply); log.insertAdjacentHTML('beforeend', reply); refreshStatus();
     } catch (err) { toast(err.message, 'bad'); }
@@ -407,9 +421,13 @@ $('#reset-btn').onclick = async () => {
   toast('Demo ripristinata', 'ok'); navigate(S.view, S.channel, true);
 };
 
+async function startApp() {
+  $('#login').hidden = true; $('#app').hidden = false; renderMe();
+  await loadChannels(); await refreshStatus(); navigate('chat');
+  if (!S.timer) S.timer = setInterval(refreshStatus, 20000);
+}
+
 (async function init() {
   $('#theme-btn').textContent = document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙';
-  S.users = await api('/api/users'); S.user = S.users[0]; renderUsers();
-  await loadChannels(); await refreshStatus(); navigate('chat');
-  setInterval(refreshStatus, 20000);
+  try { S.user = await api('/api/me'); await startApp(); } catch (e) { showLogin(); }
 })();

@@ -157,3 +157,15 @@ textarea{resize:vertical;min-height:90px}
 .empty{text-align:center;color:var(--muted);padding:40px 10px}
 @media (max-width:860px){.app{grid-template-columns:1fr}.sidebar{display:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.me-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,rgba(109,74,255,.55),rgba(255,95,162,.35));border:1px solid rgba(255,255,255,.2)}
+.me-txt{flex:1;line-height:1.25}.me-txt small{display:block;color:#f1eaff;font-size:11px}
+.me-card .icon-btn:hover{transform:none}
+.login{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:var(--bg)}
+.login[hidden]{display:none}
+.login-card{width:min(380px,100%);background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:30px 28px;box-shadow:var(--shadow);display:grid;gap:14px;animation:pop .35s}
+.login-card h1{margin:0;font-size:22px}.login-card .meta{margin:0}
+.ws-logo.big{width:54px;height:54px;font-size:26px;border-radius:16px}
+.login-err{color:var(--bad);min-height:18px;font-size:13px}
+.hint{font-size:12px;line-height:1.5}
+.app[hidden]{display:none}

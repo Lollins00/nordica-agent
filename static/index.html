@@ -9,7 +9,7 @@
 </head>
 <body>
 <div class="bg-orbs" aria-hidden="true"><i></i><i></i><i></i></div>
-<div class="app">
+<div class="app" id="app" hidden>
   <aside class="sidebar">
     <div class="ws">
       <div class="ws-logo">N</div>
@@ -17,10 +17,7 @@
       <button id="theme-btn" class="icon-btn" title="Tema chiaro/scuro" aria-label="Cambia tema">🌙</button>
     </div>
 
-    <div class="who">
-      <label class="sec-title">Stai usando come</label>
-      <div id="user-switch" class="user-switch"></div>
-    </div>
+    <div id="me-card" class="me-card"></div>
 
     <nav class="nav">
       <div class="sec-title">Company Brain</div>
@@ -83,6 +80,17 @@
     <button class="icon-btn modal-x" id="modal-x" aria-label="Chiudi">✕</button>
     <div id="modal-body"></div>
   </div>
+</div>
+<div id="login" class="login" hidden>
+  <form id="login-form" class="login-card" autocomplete="on">
+    <div class="ws-logo big">N</div>
+    <h1>Company Brain</h1><p class="meta">Accedi con il tuo account Nordica</p>
+    <div class="field"><label for="login-user">Utente</label><input id="login-user" name="username" autocomplete="username" required></div>
+    <div class="field"><label for="login-pass">Password</label><input id="login-pass" name="password" type="password" autocomplete="current-password" required></div>
+    <div id="login-err" class="login-err" role="alert"></div>
+    <button class="btn" type="submit">Accedi</button>
+    <p class="meta hint">Account demo: <b>giulia</b> (Finance), <b>marco</b> (Tech), <b>sara</b> (CEO) · password <b>nordica2026</b></p>
+  </form>
 </div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <script src="/static/app.js"></script>
