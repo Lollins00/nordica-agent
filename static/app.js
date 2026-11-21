@@ -227,7 +227,7 @@ async function startChat() {
     const [b] = await Promise.all([api(`/api/brief?${uq()}`), sleep(700)]);
     S.brief[uid] = b;
     if (S.user.id !== uid) return;
-    holder.remove(); pushMsg({ role: 'agent', type: 'brief', brief: b });
+    holder.remove(); const node = pushMsg({ role: 'agent', type: 'brief', brief: b }); $('#chat-scroll').scrollTop = Math.max(0, node.offsetTop - 12);
   } catch (err) { holder.remove(); addAgent({ text: 'Non sono riuscito a preparare il brief: ' + err.message }); }
   refreshStatus();
 }
