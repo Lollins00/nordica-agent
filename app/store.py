@@ -48,7 +48,9 @@ def save() -> None:
 def reset() -> None:
     global _state
     with _lock:
+        seen = list(get()["imap_seen"])   # le email già lette non si rileggono dopo un reset
         _state = _default()
+        _state["imap_seen"] = seen
         save()
 
 
