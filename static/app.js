@@ -147,7 +147,7 @@ async function logout() {
 $('#pw-toggle').onclick = () => {
   const inp = $('#login-pass'), show = inp.type === 'password';
   inp.type = show ? 'text' : 'password';
-  $('#eye-on').hidden = show; $('#eye-off').hidden = !show;
+  $('#eye-on').toggleAttribute('hidden', show); $('#eye-off').toggleAttribute('hidden', !show);
   const b = $('#pw-toggle'); b.setAttribute('aria-pressed', String(show));
   b.setAttribute('aria-label', show ? 'Nascondi password' : 'Mostra password'); b.title = show ? 'Nascondi password' : 'Mostra password';
   inp.focus();
