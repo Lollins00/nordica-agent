@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import actions, auth, brief, data, events, inbox, llm, mailer, memory, qa, store
+from . import actions, auth, brief, comms, data, events, inbox, llm, mailer, memory, qa, store
 from .auth import current_user
 from .config import NOW, STATIC_DIR
 from .permissions import acl_label, can_see
@@ -53,7 +53,8 @@ def api_me(user: dict = Depends(current_user)):
 def api_status(u: dict = Depends(current_user)):
     return {"llm": llm.status(), "imap": inbox.imap_status(), "mail": mailer.status(), "now": NOW.isoformat(timespec="minutes"),
             "badges": {"candidates": len(memory.facts_for(u["role"], "candidate")),
-                       "pending": sum(1 for a in actions.visible_actions(u["role"]) if a["status"] == "pending" and u["role"] in a["approvers"])}}
+                       "pending": sum(1 for a in actions.visible_actions(u["role"]) if a["status"] == "pending" and u["role"] in a["approvers"]),
+                       "requests": sum(1 for r in comms.visible_requests(u) if r["status"] == "pending" and u["role"] == "ceo")}}
 
 
 class OfflineBody(BaseModel):
@@ -193,8 +194,71 @@ def api_channel(cid: str, u: dict = Depends(current_user)):
     ch = next((c for c in data.channels() if c["id"] == cid and can_see(u["role"], c["acl"])), None)
     if not ch:
         raise HTTPException(404, "canale non trovato")
-    msgs = [s for s in data.all_sources().values() if s["type"] == "slack" and s["meta"]["channel"] == cid]
-    return {"channel": ch, "messages": sorted([{"id": m["id"], "author": m["meta"]["author"], "ts": m["date"], "text": m["text"]} for m in msgs], key=lambda m: m["ts"])}
+    return {"channel": ch, "messages": comms.messages(u, f"ch:{cid}")}
+
+
+# --------------------------------------------- comunicazione interna (tempo reale)
+@app.get("/api/conversations")
+def api_conversations(u: dict = Depends(current_user)):
+    return comms.conversations(u)
+
+
+@app.get("/api/conversations/{cid}/messages")
+def api_conv_messages(cid: str, u: dict = Depends(current_user)):
+    msgs = comms.messages(u, cid)
+    if msgs is None:
+        raise HTTPException(404, "conversazione non trovata")       # identico se non esiste o non è tua
+    return msgs
+
+
+class MessageBody(BaseModel):
+    text: str
+
+
+@app.post("/api/conversations/{cid}/messages")
+def api_conv_post(cid: str, b: MessageBody, u: dict = Depends(current_user)):
+    try:
+        return comms.post(u, cid, b.text)
+    except LookupError:
+        raise HTTPException(404, "conversazione non trovata")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/requests")
+def api_requests(u: dict = Depends(current_user)):
+    return comms.visible_requests(u)
+
+
+class RequestBody(BaseModel):
+    start: str
+    end: str
+    note: str = ""
+
+
+@app.post("/api/requests")
+def api_request_create(b: RequestBody, u: dict = Depends(current_user)):
+    try:
+        return comms.create_request(u, b.start, b.end, b.note)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/requests/{rid}/decide")
+def api_request_decide(rid: str, b: DecideBody, u: dict = Depends(current_user)):
+    try:
+        return comms.decide_request(u, rid, b.approve)
+    except LookupError:
+        raise HTTPException(404, "richiesta non trovata")
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.get("/api/updates")
+def api_updates(since: int | None = None, u: dict = Depends(current_user)):
+    return comms.updates(u, since)
 
 
 @app.get("/api/source/{sid}")

@@ -142,8 +142,26 @@ def rule_inbox(role: str) -> list[dict]:
     return out
 
 
+def rule_requests(role: str) -> list[dict]:
+    """Richieste ferie in attesa: solo la CEO (che le approva) le vede nel brief, con i controlli del Brain."""
+    if role != "ceo":
+        return []
+    from . import comms
+    out = []
+    for r in store.get()["requests"]:
+        if r["status"] != "pending":
+            continue
+        cks = comms.checks(r)
+        bad = [c for c in cks if c["severity"] == "high"]
+        out.append({"id": f"request:{r['id']}", "rule": "request", "severity": "high" if bad else "med",
+                    "title": f"Ferie da approvare: {r['user_name']} ({fmt_short(r['start'])}–{fmt_short(r['end'])})",
+                    "detail": f"{r['first']} chiede ferie dal {fmt_short(r['start'])} al {fmt_short(r['end'])}. " + " ".join(c["text"] for c in cks),
+                    "sources": [s for c in cks for s in c["sources"]], "action": None, "_sort": -8})
+    return out
+
+
 def compute_alerts(role: str) -> list[dict]:
-    alerts = rule_conflicts(role) + rule_absences(role) + rule_inbox(role) + rule_unanswered(role) + rule_deadlines(role)
+    alerts = rule_conflicts(role) + rule_requests(role) + rule_absences(role) + rule_inbox(role) + rule_unanswered(role) + rule_deadlines(role)
     alerts.sort(key=lambda a: (SEV_ORDER[a["severity"]], a["_sort"]))
     for a in alerts:
         a.pop("_sort", None)

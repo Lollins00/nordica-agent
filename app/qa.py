@@ -74,12 +74,16 @@ THRESHOLD = 1.0
 UNKNOWN_TEXT = "Non lo so: tra i fatti approvati che posso consultare non c'è nulla che risponda a questa domanda."
 
 
-def retrieve(role: str, question: str, k: int = 5) -> tuple[list[dict], dict]:
-    """Ritorna (fatti pertinenti visibili, debug). I fatti non visibili vengono esclusi PRIMA del ranking."""
+def retrieve(role: str, question: str, k: int = 5, audience: tuple[str, ...] | None = None) -> tuple[list[dict], dict]:
+    """Ritorna (fatti pertinenti visibili, debug). I fatti non visibili vengono esclusi PRIMA del ranking.
+    `audience`: ruoli che leggeranno la risposta (es. i membri di un canale). Un fatto passa solo se lo
+    possono vedere TUTTI: così una risposta in un canale non mostra a nessuno ciò che non potrebbe vedere."""
     qs = set(stems(question))
-    approved = memory.facts_for(role, "approved") if role else []
+    readers = {role, *(audience or ())}
+    ok = lambda f: all(can_see(r, f["acl"]) for r in readers)
     all_approved = [f for f in memory.all_facts() if f["status"] == "approved"]
-    hidden = [f for f in all_approved if not can_see(role, f["acl"])]
+    approved = [f for f in all_approved if ok(f)] if role else []
+    hidden = [f for f in all_approved if not ok(f)]
     hidden_match = sum(1 for f in hidden if score(qs, f) >= THRESHOLD)   # solo un conteggio, mai il contenuto
     ranked = sorted(((score(qs, f), f) for f in approved), key=lambda x: -x[0])
     hits = [f for s, f in ranked if s >= THRESHOLD][:k]
@@ -144,8 +148,8 @@ def _llm_answer(question: str, facts: list[dict]) -> tuple[str | None, list[str]
     return answer, sorted(cited)
 
 
-def answer(role: str | None, question: str) -> dict:
-    hits, debug = retrieve(role, question)
+def answer(role: str | None, question: str, audience: tuple[str, ...] | None = None) -> dict:
+    hits, debug = retrieve(role, question, audience=audience)
     if not hits:
         return {"kind": "unknown", "text": UNKNOWN_TEXT, "citations": [], "writer": "regole", "debug": debug}
     text, used = _llm_answer(question, hits)

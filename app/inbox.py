@@ -95,6 +95,8 @@ def ingest(subject: str, body: str, via: str = "simulatore", from_addr: str = ""
                        "text": f"Smistata al settore {SECTORS[role]} ({owner['first']}). Nessuna risposta né dato inviato al mittente: "
                                f"ho preparato una bozza IN ATTESA e {len(facts)} fatti candidati."}}
     st["inbox"].insert(0, msg)
+    from . import comms
+    comms.notify(comms.users_with_role(role, "ceo"), f"📥 Nuova email da {msg['from']}: «{subject}» → {SECTORS[role]}", "inbox", view="inbox")
     st["brief_cache"].clear()
     store.save()
     return msg

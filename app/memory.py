@@ -84,7 +84,7 @@ def _heuristic(text: str) -> list[dict]:
     return out[:5]
 
 
-def extract_candidates(source: dict) -> tuple[list[dict], str]:
+def extract_candidates(source: dict, origin: str = "estratto da email in ingresso") -> tuple[list[dict], str]:
     """Estrae fatti candidati da una fonte nuova. Gemini se disponibile, altrimenti euristica. Torna (fatti, motore)."""
     prompt = ("Estrai dal testo i fatti verificabili (date, importi, decisioni, impegni). "
               "Rispondi in JSON: {\"facts\": [{\"text\": \"frase autosufficiente\", \"topics\": [\"parole chiave\"]}]}. "
@@ -107,7 +107,7 @@ def extract_candidates(source: dict) -> tuple[list[dict], str]:
         st["extra_facts"].append({"id": fid, "statement": it["text"], "key": None, "value": None,
                                   "topics": it["topics"], "source": data.source_ref(source), "acl": source["acl"],
                                   "context": f"{source.get('meta', {}).get('subject', '')}. {source['text']}",
-                                  "init": "candidate", "origin": f"estratto da email in ingresso ({engine})"})
+                                  "init": "candidate", "origin": f"{origin} ({engine})"})
         created.append(fid)
     store.save()
     return [get_fact(i) for i in created], engine

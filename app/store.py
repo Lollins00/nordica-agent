@@ -20,6 +20,10 @@ def _default() -> dict:
         "imap_seen": [],
         "counters": {},
         "brief_cache": {},
+        "messages": [],         # messaggi live (canali e diretti)
+        "requests": [],         # richieste interne (ferie)
+        "notifications": [],
+        "seq": 0,               # cursore per il tempo reale
     }
 
 
@@ -49,10 +53,12 @@ def reset() -> None:
     global _state
     with _lock:
         seen = list(get()["imap_seen"])   # le email già lette non si rileggono dopo un reset
-        counters = dict(get()["counters"])  # gli ID non ripartono da 1: una pagina rimasta aperta non può colpire un'azione diversa
+        counters = dict(get()["counters"])
+        seq = get().get("seq", 0)               # il cursore del tempo reale non torna indietro  # gli ID non ripartono da 1: una pagina rimasta aperta non può colpire un'azione diversa
         _state = _default()
         _state["imap_seen"] = seen
         _state["counters"] = counters
+        _state["seq"] = seq
         save()
 
 
