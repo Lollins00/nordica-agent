@@ -1,4 +1,4 @@
 {
-  "acme.delivery_date": {"label": "la data di consegna della Release 2 Acme", "type": "date", "task_id": "T-101"},
-  "acme.payment_terms": {"label": "i termini di pagamento Acme", "type": "days"}
+  "acme.delivery_date": {"label": "data di consegna della Release 2 Acme", "type": "date", "task_id": "T-101"},
+  "acme.payment_terms": {"label": "termini di pagamento Acme", "type": "days"}
 }
