@@ -20,20 +20,23 @@ poi http://localhost:8000 · test dei 7 controlli: `.venv\Scripts\python.exe -m 
 | 6 | Azioni in attesa finché si approva | `app/actions.py`, vista Azioni | `test_6_*` |
 | 7 | UI: chat, email del mattino, mock Slack | `static/` | `test_7_*` |
 
-Extra: calendario locale con form "Nuovo evento"; casella email dell'agente **solo in ingresso**
-(simulatore nella UI, IMAP in sola lettura se `IMAP_USER`/`IMAP_PASSWORD` sono nel `.env`).
-Nessuna email viene mai inviata. Il ruolo del mittente si dichiara nell'oggetto: `[Giulia]`, `[Marco]`, `[Sara]`.
+Extra: calendario locale con form "Nuovo evento"; **login separati** (giulia / marco / sara, password demo `nordica2026`;
+il ruolo viene sempre dalla sessione sul server); **casella email dell'agente** solo in ingresso e sempre non fidata:
+ogni email esterna viene classificata per settore (Finance/Tech/CEO) e smistata a chi di competenza, con una bozza di risposta
+IN ATTESA e fatti candidati. Chi scrive non riceve mai dati né risposte e un'email non può innescare azioni.
+Simulatore nella UI; lettura IMAP reale (sola lettura) se `IMAP_USER`/`IMAP_PASSWORD` sono nel `.env`. Nessuna email viene mai inviata.
 
 ## Copione demo (5 minuti)
-1. **Giulia**: il Brain parla per primo (brief a regole: conflitto 30/11 vs 5/12, email Acme senza risposta, ferie di Marco).
-2. Giulia: «Qual è il margine su Acme?» → 22% con fonte. Passa a **Marco**, stessa domanda → «Non lo so». (Dietro le quinte: fatti esclusi dai permessi.)
-3. Marco: «Qual è la causa dell'incidente del 12/11?» → risponde; Giulia no.
+Usa due finestre/profili del browser (o logout/login) per mostrare lo stesso quesito da due ruoli.
+1. **giulia**: il Brain parla per primo (brief a regole: conflitti, email senza risposta, ferie di Marco).
+2. giulia: «Qual è il margine su Acme?» → 22% con fonte. **marco**, stessa domanda → «Non lo so» («Dietro le quinte» mostra i fatti esclusi dai permessi).
+3. marco: «Qual è la causa dell'incidente del 12/11?» → risponde; giulia no.
 4. «Qual è la penale per il ritardo?» → «Non lo so» (è solo candidato) → Memoria → Approva → richiedi di nuovo.
 5. «Quanto costa la mensa aziendale?» → «Non lo so».
 6. «Quando è la consegna della Release 2?» → fonti discordanti, entrambe citate.
-7. «Sposta la scadenza della consegna Release 2 al 30/11» → azione IN ATTESA → solo Tech/CEO possono approvare.
-8. «Scrivi una bozza di email ad Acme per la richiesta di demo» → bozza in attesa (mai fatti riservati in una mail a un esterno).
-9. Casella agente: stessa domanda con `[Giulia]` e `[Marco]`, e senza tag (nessun permesso).
+7. marco: «Sposta la scadenza della consegna Release 2 al 30/11» → azione IN ATTESA → approva (giulia non può).
+8. giulia: «Scrivi una bozza di email ad Acme per la richiesta di demo» → bozza in attesa (mai dati riservati).
+9. Casella agente (come sara): «Cliente: sconto fattura» → Finance, «Cliente: portale giù» → Tech. Ogni persona vede solo le richieste del proprio settore, con bozza in attesa. «Esterno che chiede dati» → nessun dato esce.
 10. Interruttore «Simula offline»: tutto continua a funzionare con il fallback.
 
-Autenticazione solo dimostrativa (selettore utente nella UI).
+Le credenziali demo sono salvate hashate (PBKDF2); le sessioni sono in memoria (riavviando il server serve un nuovo login).

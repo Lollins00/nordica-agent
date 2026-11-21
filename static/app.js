@@ -22,7 +22,7 @@ const TITLES = {
   memory: ['Memoria', 'I fatti estratti sono candidati: decidi tu cosa il Brain può usare'],
   actions: ['Azioni', 'Nulla accade finché una persona abilitata non approva'],
   calendar: ['Calendario', 'Eventi visibili al tuo ruolo'],
-  inbox: ['Casella dell\'agente', 'Email in ingresso (sola lettura): il ruolo si dichiara nell\'oggetto, es. [Giulia]'],
+  inbox: ['Casella dell\'agente', 'Email esterne smistate per settore: chi scrive non riceve mai dati'],
   slack: ['Slack', 'Vedi solo i canali del tuo ruolo'],
 };
 const SUGGESTIONS = ['Qual è il margine su Acme?', 'Qual è la causa dell\'incidente del 12/11?', 'Quando è la consegna della Release 2?',

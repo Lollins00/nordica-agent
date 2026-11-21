@@ -18,7 +18,8 @@ LLM: Gemini via `GEMINI_API_KEY` da `.env`, sempre con fallback deterministico s
 - Tutto resta dentro la UI: **nessun invio di email**. La casella email dell'agente è solo in INGRESSO (IMAP, in sola lettura); risposte, brief e avvisi appaiono solo nella UI.
 - Calendario: base = calendario locale JSON con form "Nuovo evento" nella UI (eventi inseriti da una persona = immediati; eventi proposti dall'agente = in attesa). Bonus solo se avanza tempo: lettura Google Calendar via URL iCal.
 - Ingresso email e calendario sono extra: si costruiscono DOPO i 7 comandamenti. Nessun extra può violarli.
-- Mittente email → ruolo tramite tag nell'oggetto (`[Giulia]`, `[Marco]`, `[Sara]`); simulatore di inbox nella UI come rete di sicurezza.
+- Login separati (sessione server-side): il ruolo viene SEMPRE dalla sessione, mai dal client. Niente selettore utenti.
+- La casella email è NON FIDATA: ogni email è smistata per settore (Finance/Tech/CEO) a chi di competenza con bozza in attesa e fatti candidati; il mittente non riceve mai dati e un'email non può innescare azioni. Nessun tag nell'oggetto. Il settore decide CHI vede la richiesta, mai cosa può sapere chi scrive (comandamento 3).
 - Orologio demo fisso (lunedì 23/11/2026 ore 09:00 (settimana di dati 16–20/11)) per risultati ripetibili.
 - Commit piccoli e frequenti. **Niente push**: lo fa l'utente. `.env` e `state/` mai in git.
 - Tempi: demo costruita in meno di 1 ora, poi solo test e rifinitura.
