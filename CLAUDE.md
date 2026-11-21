@@ -15,7 +15,7 @@ LLM: Gemini via `GEMINI_API_KEY` da `.env`, sempre con fallback deterministico s
 
 ## Decisioni di perimetro
 
-- Tutto resta dentro la UI: **nessun invio di email**. La casella email dell'agente è solo in INGRESSO (IMAP, in sola lettura); risposte, brief e avvisi appaiono solo nella UI.
+- La casella email dell'agente è in INGRESSO (IMAP, sola lettura). Si invia email SOLO dalla dashboard (SMTP) come effetto di una bozza approvata da una persona, con DIROTTAMENTO ATTIVO di default (MAIL_MODE=redirect → tutto a MAIL_REDIRECT_TO). Invio reale solo con MAIL_MODE=real nel .env. Risposte, brief e avvisi restano nella UI.
 - Calendario: base = calendario locale JSON con form "Nuovo evento" nella UI (eventi inseriti da una persona = immediati; eventi proposti dall'agente = in attesa). Bonus solo se avanza tempo: lettura Google Calendar via URL iCal.
 - Ingresso email e calendario sono extra: si costruiscono DOPO i 7 comandamenti. Nessun extra può violarli.
 - Login separati (sessione server-side): il ruolo viene SEMPRE dalla sessione, mai dal client. Niente selettore utenti.

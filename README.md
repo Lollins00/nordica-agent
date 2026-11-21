@@ -24,7 +24,12 @@ Extra: calendario locale con form "Nuovo evento"; **login separati** (giulia / m
 il ruolo viene sempre dalla sessione sul server); **casella email dell'agente** solo in ingresso e sempre non fidata:
 ogni email esterna viene classificata per settore (Finance/Tech/CEO) e smistata a chi di competenza, con una bozza di risposta
 IN ATTESA e fatti candidati. Chi scrive non riceve mai dati né risposte e un'email non può innescare azioni.
-Simulatore nella UI; lettura IMAP reale (sola lettura) se `IMAP_USER`/`IMAP_PASSWORD` sono nel `.env`. Nessuna email viene mai inviata.
+Simulatore nella UI; lettura IMAP reale (sola lettura) se `IMAP_USER`/`IMAP_PASSWORD` sono nel `.env`. 
+**Invio email dalla dashboard (SMTP, stessa password per app dell'IMAP).** Le bozze si possono modificare (destinatario,
+oggetto, testo; l'originale dell'AI resta registrata) e restano IN ATTESA. Solo "Approva e invia" (con conferma esplicita)
+spedisce, e solo chi ha il permesso. **Dirottamento attivo di default** (`MAIL_MODE=redirect`): ogni email va a
+`MAIL_REDIRECT_TO` con il destinatario reale nell'oggetto e nel testo. L'invio reale ai destinatari richiede `MAIL_MODE=real`
+nel `.env` (mai dalla UI) e rifiuta i domini finti (.example). Se l'invio fallisce l'azione resta in attesa; limite di 10 invii/ora.
 
 ## Copione demo (5 minuti)
 Usa due finestre/profili del browser (o logout/login) per mostrare lo stesso quesito da due ruoli.
