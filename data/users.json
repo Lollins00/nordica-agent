@@ -1,0 +1,5 @@
+[
+  {"id": "giulia", "name": "Giulia Bianchi", "first": "Giulia", "role": "finance", "title": "Finance", "color": "#f76707"},
+  {"id": "marco", "name": "Marco Rossi", "first": "Marco", "role": "tech", "title": "Tech Lead", "color": "#1c7ed6"},
+  {"id": "sara", "name": "Sara Conti", "first": "Sara", "role": "ceo", "title": "CEO", "color": "#7048e8"}
+]

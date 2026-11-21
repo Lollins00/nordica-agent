@@ -1,0 +1,8 @@
+[
+  {"id": "EV-01", "title": "Standup di team", "start": "2026-11-23T09:30", "end": "2026-11-23T09:45", "owner": "sara", "acl": "all", "type": "meeting"},
+  {"id": "EV-02", "title": "Call Acme: stato Release 2", "start": "2026-11-24T11:00", "end": "2026-11-24T12:00", "owner": "marco", "acl": "all", "type": "meeting"},
+  {"id": "EV-03", "title": "Review budget Q1", "start": "2026-11-25T10:00", "end": "2026-11-25T11:30", "owner": "sara", "acl": ["ceo"], "type": "meeting"},
+  {"id": "EV-04", "title": "Pranzo di team", "start": "2026-11-27T13:00", "end": "2026-11-27T14:30", "owner": "sara", "acl": "all", "type": "meeting"},
+  {"id": "EV-05", "title": "Chiusura mese e fatturazione", "start": "2026-11-30T09:00", "end": "2026-11-30T12:00", "owner": "giulia", "acl": ["finance"], "type": "meeting"},
+  {"id": "EV-06", "title": "Ferie Marco", "start": "2026-12-01T00:00", "end": "2026-12-05T23:59", "owner": "marco", "acl": "all", "type": "ferie", "person": "marco", "person_name": "Marco"}
+]

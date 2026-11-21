@@ -1,0 +1,52 @@
+[
+  {"id": "D-01", "title": "Contratto quadro Acme Logistica – Release 2", "kind": "contratto", "date": "2026-09-14", "acl": "all", "authority": true,
+   "sections": [
+     {"heading": "Oggetto", "text": "Nordica Srl realizza la Release 2 del portale di tracking spedizioni (Tracker) per Acme Logistica."},
+     {"heading": "Consegna", "text": "Il Fornitore consegna la Release 2 entro il 30/11/2026."},
+     {"heading": "Supporto", "text": "Presa in carico delle segnalazioni critiche entro 8 ore lavorative dalla richiesta."}
+   ],
+   "claims": [
+     {"fact": "F-CONTRACT-DELIV", "key": "acme.delivery_date", "value": "2026-11-30", "text": "Il contratto con Acme prevede la consegna della Release 2 entro il 30/11/2026.", "topics": ["consegna", "release", "scadenza", "contratto", "data"], "init": "approved"},
+     {"fact": "F-CONTRACT-SLA", "key": null, "value": null, "text": "Il contratto prevede la presa in carico delle segnalazioni critiche entro 8 ore lavorative.", "topics": ["sla", "supporto", "assistenza", "ore", "segnalazioni"], "init": "approved"}
+   ]},
+  {"id": "D-02", "title": "Piano economico Acme (riservato Finance)", "kind": "economico", "date": "2026-09-14", "acl": ["finance"], "authority": true,
+   "sections": [
+     {"heading": "Valore", "text": "Valore complessivo del contratto: 180.000 € suddivisi in 3 SAL (36.000 €, 54.000 €, 90.000 €)."},
+     {"heading": "Margine", "text": "Costo previsto 140.400 €. Margine lordo previsto sul progetto: 22%."},
+     {"heading": "Penali", "text": "Penale dell'1,5% a settimana sul valore del contratto in caso di ritardo nella consegna della Release 2."},
+     {"heading": "Pagamenti", "text": "Pagamento di ogni SAL a 30 giorni dall'emissione della fattura."}
+   ],
+   "claims": [
+     {"fact": "F-ECON-VALUE", "key": null, "value": null, "text": "Il valore complessivo del contratto Acme è di 180.000 €, suddiviso in 3 SAL.", "topics": ["valore", "importo", "contratto", "sal", "prezzo"], "init": "approved"},
+     {"fact": "F-ECON-MARGIN", "key": null, "value": null, "text": "Il margine lordo previsto sul progetto Acme è del 22% (costo previsto 140.400 €).", "topics": ["margine", "marginalita", "guadagno", "profitto", "costo"], "init": "approved"},
+     {"fact": "F-ECON-PENALTY", "key": null, "value": null, "text": "In caso di ritardo sulla consegna della Release 2 il contratto prevede una penale dell'1,5% a settimana.", "topics": ["penale", "ritardo", "sanzione", "consegna", "settimana"]},
+     {"fact": "F-ECON-PAYMENT", "key": "acme.payment_terms", "value": "30", "text": "Il contratto prevede il pagamento di ogni SAL a 30 giorni dall'emissione della fattura.", "topics": ["pagamento", "termini", "sal", "fattura", "giorni"], "init": "approved"}
+   ]},
+  {"id": "D-03", "title": "Post-mortem incidente database del 12/11", "kind": "tecnico", "date": "2026-11-16", "acl": ["tech"],
+   "sections": [
+     {"heading": "Cause", "text": "Una migrazione eseguita senza indice ha saturato il database di tracking."},
+     {"heading": "Impatto", "text": "Circa 3 ore di downtime del portale Acme Tracker."},
+     {"heading": "Azioni", "text": "Aggiunto indice, introdotta review obbligatoria delle migrazioni, attivato monitoraggio."}
+   ],
+   "claims": [
+     {"fact": "F-INC-CAUSE", "key": null, "value": null, "text": "L'incidente del 12/11 sul database di tracking è stato causato da una migrazione eseguita senza indice.", "topics": ["incidente", "causa", "database", "migrazione", "indice", "guasto"], "init": "approved"},
+     {"fact": "F-INC-IMPACT", "key": null, "value": null, "text": "L'incidente del 12/11 ha causato circa 3 ore di downtime del portale Acme Tracker.", "topics": ["incidente", "downtime", "impatto", "portale", "ore"], "init": "approved"}
+   ]},
+  {"id": "D-04", "title": "Policy ferie e rimborsi", "kind": "policy", "date": "2026-01-10", "acl": "all",
+   "sections": [
+     {"heading": "Ferie", "text": "Le ferie vanno richieste con almeno 15 giorni di anticipo tramite il responsabile."},
+     {"heading": "Rimborsi", "text": "Il rimborso chilometrico è di 0,45 € al km, previa nota spese."}
+   ],
+   "claims": [
+     {"fact": "F-POL-FERIE", "key": null, "value": null, "text": "Le ferie vanno richieste con almeno 15 giorni di anticipo.", "topics": ["ferie", "policy", "richiesta", "anticipo", "vacanza"], "init": "approved"},
+     {"fact": "F-POL-KM", "key": null, "value": null, "text": "Il rimborso chilometrico è di 0,45 € al km.", "topics": ["rimborso", "chilometrico", "km", "trasferta", "nota", "spese"], "init": "approved"}
+   ]},
+  {"id": "D-05", "title": "Verbale riunione direzione del 17/11 (riservato CEO)", "kind": "verbale", "date": "2026-11-17", "acl": ["ceo"],
+   "sections": [
+     {"heading": "Assunzioni", "text": "Approvato un budget di 90.000 € per assumere 2 sviluppatori nel primo trimestre."},
+     {"heading": "Priorità", "text": "Chiudere la Release 2 Acme è la priorità numero uno del trimestre."}
+   ],
+   "claims": [
+     {"fact": "F-CEO-HIRING", "key": null, "value": null, "text": "La direzione ha approvato un budget di 90.000 € per assumere 2 sviluppatori nel primo trimestre.", "topics": ["assunzioni", "budget", "sviluppatori", "hiring", "trimestre"], "init": "approved"}
+   ]}
+]

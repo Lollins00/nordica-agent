@@ -1,0 +1,37 @@
+{
+  "channels": [
+    {"id": "general", "name": "general", "topic": "Tutto il team Nordica", "acl": "all"},
+    {"id": "acme-delivery", "name": "acme-delivery", "topic": "Release 2 per Acme Logistica", "acl": "all"},
+    {"id": "finance", "name": "finance", "topic": "Fatture, incassi, budget (privato)", "acl": ["finance"], "private": true},
+    {"id": "tech-private", "name": "tech-private", "topic": "Architettura e infrastruttura (privato)", "acl": ["tech"], "private": true},
+    {"id": "direzione", "name": "direzione", "topic": "Solo CEO (privato)", "acl": ["ceo"], "private": true}
+  ],
+  "messages": [
+    {"id": "C-01", "channel": "general", "author": "Sara Conti", "author_id": "sara", "ts": "2026-11-16T09:05:00", "text": "Buon lunedì team! Ricordo che venerdì 27/11 alle 13:00 c'è il pranzo di team 🍕",
+     "claims": [{"fact": "F-TEAM-LUNCH", "key": null, "value": null, "text": "Il pranzo di team è venerdì 27/11/2026 alle 13:00.", "topics": ["pranzo", "team", "evento", "venerdi"], "init": "approved"}]},
+    {"id": "C-02", "channel": "general", "author": "Elena Gallo", "author_id": null, "ts": "2026-11-17T11:30:00", "text": "Promemoria: la policy ferie e rimborsi è aggiornata nel drive 📎", "claims": []},
+    {"id": "C-03", "channel": "general", "author": "Marco Rossi", "author_id": "marco", "ts": "2026-11-18T14:10:00", "text": "Io sarò in ferie dal 1 al 5 dicembre, già approvato da Sara 🏖️",
+     "claims": [{"fact": "F-HOLIDAY-MARCO", "key": null, "value": null, "text": "Marco Rossi è in ferie dal 01/12/2026 al 05/12/2026.", "topics": ["ferie", "marco", "assenza", "dicembre", "tech"], "init": "approved"}]},
+
+    {"id": "C-10", "channel": "acme-delivery", "author": "Sara Conti", "author_id": "sara", "ts": "2026-11-17T16:00:00", "text": "Ho confermato ad Acme la consegna del 30/11 come da contratto. Contiamo su di voi 💪", "claims": []},
+    {"id": "C-11", "channel": "acme-delivery", "author": "Marco Rossi", "author_id": "marco", "ts": "2026-11-18T10:20:00", "text": "Onestamente col modulo di geolocalizzazione da sistemare la Release 2 la chiudiamo entro il 5/12. Ho già aggiornato il task.",
+     "claims": [{"fact": "F-CHAT-DELIV", "key": "acme.delivery_date", "value": "2026-12-05", "text": "Marco stima nel canale #acme-delivery di chiudere la Release 2 entro il 05/12/2026.", "topics": ["consegna", "release", "stima", "data", "geolocalizzazione"]}]},
+    {"id": "C-12", "channel": "acme-delivery", "author": "Elena Gallo", "author_id": null, "ts": "2026-11-18T10:35:00", "text": "Confermo, il 30/11 è molto stretto con i test.", "claims": []},
+    {"id": "C-13", "channel": "acme-delivery", "author": "Giulia Bianchi", "author_id": "giulia", "ts": "2026-11-19T12:00:00", "text": "Se sforiamo il 30/11 ci sono conseguenze contrattuali, ne parlo a parte con Sara.", "claims": []},
+
+    {"id": "C-20", "channel": "finance", "author": "Giulia Bianchi", "author_id": "giulia", "ts": "2026-11-18T11:00:00", "text": "Acme ci ha chiesto di passare a 60 giorni di pagamento. Il SAL1 comunque l'hanno incassato a 61 giorni dalla fattura.",
+     "claims": [{"fact": "F-FIN-SAL1", "key": null, "value": null, "text": "Il SAL1 Acme è stato incassato dopo 61 giorni dall'emissione della fattura.", "topics": ["incasso", "sal1", "pagamento", "ritardo", "giorni"]}]},
+    {"id": "C-21", "channel": "finance", "author": "Sara Conti", "author_id": "sara", "ts": "2026-11-18T11:12:00", "text": "Non concediamo i 60 giorni senza una contropartita. Ne riparliamo lunedì.",
+     "claims": [{"fact": "F-FIN-POLICY", "key": null, "value": null, "text": "La direzione non intende concedere i 60 giorni di pagamento ad Acme senza una contropartita.", "topics": ["pagamento", "termini", "contropartita", "direzione", "negoziazione"]}]},
+    {"id": "C-22", "channel": "finance", "author": "Giulia Bianchi", "author_id": "giulia", "ts": "2026-11-19T15:30:00", "text": "Il SAL2 da 54.000 € lo fatturiamo appena Acme accetta la Release 2.",
+     "claims": [{"fact": "F-FIN-SAL2", "key": null, "value": null, "text": "Il SAL2 Acme da 54.000 € verrà fatturato quando Acme accetta la Release 2.", "topics": ["sal2", "fattura", "fatturare", "importo", "release"]}]},
+
+    {"id": "C-30", "channel": "tech-private", "author": "Marco Rossi", "author_id": "marco", "ts": "2026-11-18T09:00:00", "text": "Stima rifacimento modulo geolocalizzazione: 14 giorni-uomo. Con Elena e Paolo non chiudiamo prima del 5/12.",
+     "claims": [{"fact": "F-DEBT-GEO", "key": null, "value": null, "text": "Il rifacimento del modulo di geolocalizzazione richiede circa 14 giorni-uomo.", "topics": ["geolocalizzazione", "stima", "rifacimento", "debito", "tecnico", "giorni-uomo"]}]},
+    {"id": "C-31", "channel": "tech-private", "author": "Elena Gallo", "author_id": null, "ts": "2026-11-19T09:40:00", "text": "Ho ruotato le credenziali AWS dopo l'incidente.",
+     "claims": [{"fact": "F-AWS-ROT", "key": null, "value": null, "text": "Le credenziali AWS sono state ruotate dopo l'incidente del 12/11.", "topics": ["aws", "credenziali", "sicurezza", "incidente"]}]},
+
+    {"id": "C-40", "channel": "direzione", "author": "Sara Conti", "author_id": "sara", "ts": "2026-11-20T18:00:00", "text": "Il rinnovo del contratto Acme lo apriamo a gennaio, dipende da come chiudiamo la Release 2.",
+     "claims": [{"fact": "F-CEO-RENEW", "key": null, "value": null, "text": "Il rinnovo del contratto Acme verrà discusso a gennaio, in base all'esito della Release 2.", "topics": ["rinnovo", "contratto", "gennaio", "strategia"]}]}
+  ]
+}
