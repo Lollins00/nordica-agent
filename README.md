@@ -1,7 +1,7 @@
 # Company Brain · Nordica Srl (demo hackathon)
 
-FastAPI + UI web in stile Slack (dark mode, card, animazioni). Dati finti in `data/*.json`, orologio demo fisso
-(lunedì 23/11/2026 09:00). LLM: Gemini via `GEMINI_API_KEY` (`.env`) con fallback deterministico.
+FastAPI + UI web in stile Slack (dark mode, card, animazioni). Dati finti in `data/*.json`. Orologio: ora reale del
+computer; per provare la demo in un altro giorno con gli stessi risultati aggiungi `DEMO_NOW=2026-11-21T09:00:00` al `.env`. LLM: Gemini via `GEMINI_API_KEY` (`.env`) con fallback deterministico.
 
 ## Avvio
 ```
@@ -37,8 +37,14 @@ candidati e, citato con `@brain`, risponde nel canale usando solo fatti che TUTT
 **Richieste ferie**: vanno alla CEO, unica a decidere; il Brain segnala da solo, con le fonti, preavviso inferiore ai 15 giorni
 della policy e scadenze di cui la persona è responsabile. Notifiche in tempo reale a chi è coinvolto.
 
+**Domande riformulate**: se la ricerca esatta non trova nulla, Gemini riscrive SOLO la domanda (mai i dati) in concetti
+e sinonimi; il «non lo so» resta deciso dal codice. Un nome proprio nella domanda (es. «progetto Beta») deve comparire nel fatto.
+**Quota Gemini gratuita**: 15 richieste/minuto per modello; il client usa un modello alla volta, mette in pausa quelli
+in quota (429) e tiene una cache di 10 minuti. Se la quota finisce, tutto continua con il fallback deterministico.
+**Dettagli tecnici**: interruttore in basso a sinistra che mostra «Dietro le quinte» sotto ogni risposta (utile per il controllo 3).
+
 ## Copione demo (5-7 minuti)
-Due finestre/profili del browser: a sinistra **giulia** o **marco**, a destra **sara**.
+Due finestre affiancate con indirizzi diversi (sessioni separate): **http://localhost:8000** per giulia o marco, **http://127.0.0.1:8000** per sara.
 1. **Parla per primo** – accedi: il brief compare da solo (3 avvisi a Giulia, 3 a Marco, 5 a Sara: conflitto 30/11 vs 05/12, email Acme senza risposta, scadenze). Mostra anche «Email del mattino».
 2. **Memoria curata** – giulia: «Qual è la penale per il ritardo?» → «Non lo so». In Memoria approva «penale 1,5%» e **rifiuta** «secondo Franco sarebbe il 5%». Richiedi → solo 1,5%, con fonte.
 3. **Sa chi chiede** – «Qual è il margine su Acme?»: giulia → 22% con fonte; marco → «Non lo so». (E marco: «Qual è la causa dell'incidente del 12/11?» → risponde; giulia no.)
