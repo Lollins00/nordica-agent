@@ -144,11 +144,20 @@ async function logout() {
   S.chat = {}; S.brief = {}; S.slack = {}; location.reload();
 }
 
+$('#pw-toggle').onclick = () => {
+  const inp = $('#login-pass'), show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  $('#eye-on').hidden = show; $('#eye-off').hidden = !show;
+  const b = $('#pw-toggle'); b.setAttribute('aria-pressed', String(show));
+  b.setAttribute('aria-label', show ? 'Nascondi password' : 'Mostra password'); b.title = show ? 'Nascondi password' : 'Mostra password';
+  inp.focus();
+};
+
 $('#login-form').addEventListener('submit', async e => {
   e.preventDefault(); const btn = $('#login-form button'); btn.disabled = true;
   try {
     S.user = await api('/api/login', { method: 'POST', body: { username: $('#login-user').value, password: $('#login-pass').value } });
-    $('#login-pass').value = ''; await startApp();
+    $('#login-pass').value = ''; if ($('#login-pass').type === 'text') $('#pw-toggle').click(); await startApp();
   } catch (err) { $('#login-err').textContent = err.message; }
   btn.disabled = false;
 });

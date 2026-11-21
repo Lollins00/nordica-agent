@@ -30,7 +30,12 @@ def _static_facts() -> list[dict]:
 def all_facts() -> list[dict]:
     st = store.get()
     facts = _static_facts() + [dict(f) for f in st["extra_facts"]]
+    sources = data.all_sources()
     for f in facts:
+        if f["id"].startswith("F-IN-") and not f.get("context"):      # fatti estratti prima dell'introduzione del contesto
+            s = sources.get(f["source"]["id"])
+            if s:
+                f["context"] = f"{s.get('meta', {}).get('subject', '')}. {s['text']}"
         dec = st["facts"].get(f["id"], {})
         f["status"] = dec.get("status", f.get("init", "candidate"))
         f["decided_by"] = dec.get("decided_by")
@@ -72,6 +77,10 @@ def _heuristic(text: str) -> list[dict]:
         if len(s) > 25 and _SIGNAL.search(s) and not s.endswith("?"):
             words = [w for w in re.findall(r"[a-zàèéìòù]{4,}", norm(s))][:8]
             out.append({"text": s, "topics": words})
+    if not out:                          # nessun segnale lessicale: tengo comunque l'essenza dell'email come candidato
+        first = " ".join(x.strip() for x in _SENT.split(text) if x.strip())[:220].strip()
+        if first:
+            out.append({"text": first, "topics": [w for w in re.findall(r"[a-zàèéìòù]{4,}", norm(first))][:8]})
     return out[:5]
 
 
@@ -97,6 +106,7 @@ def extract_candidates(source: dict) -> tuple[list[dict], str]:
         fid = store.next_id("F-IN")
         st["extra_facts"].append({"id": fid, "statement": it["text"], "key": None, "value": None,
                                   "topics": it["topics"], "source": data.source_ref(source), "acl": source["acl"],
+                                  "context": f"{source.get('meta', {}).get('subject', '')}. {source['text']}",
                                   "init": "candidate", "origin": f"estratto da email in ingresso ({engine})"})
         created.append(fid)
     store.save()

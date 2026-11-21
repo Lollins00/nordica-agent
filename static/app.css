@@ -169,3 +169,8 @@ textarea{resize:vertical;min-height:90px}
 .login-err{color:var(--bad);min-height:18px;font-size:13px}
 .hint{font-size:12px;line-height:1.5}
 .app[hidden]{display:none}
+
+.pw{position:relative}.pw input{padding-right:42px}
+.pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
+.pw-toggle:hover{color:var(--accent);background:var(--panel)}.pw-toggle:focus-visible{outline:2px solid var(--accent)}
+.pw-toggle svg[hidden]{display:none}

@@ -27,6 +27,7 @@ SYN_GROUPS = [
     ("margine", {"margine", "margini", "marginalita", "guadagno", "guadagni", "profitto", "profitti", "utile", "ricavo"}),
     ("pagamento", {"pagamento", "pagamenti", "pagare", "pagato", "incasso", "incassi", "incassato", "incassare", "paga"}),
     ("incidente", {"incidente", "guasto", "outage", "downtime", "blocco", "crash", "successo", "accaduto", "durato", "durata"}),
+    ("problema", {"problema", "problemi", "errore", "errori", "bug", "malfunzionamento", "disservizio", "segnalazione", "segnalato", "urgente"}),
     ("budget", {"budget", "stanziato", "stanziamento", "stanziare", "fondi"}),
     ("ferie", {"ferie", "vacanza", "vacanze", "assenza", "assente"}),
     ("penale", {"penale", "penali", "sanzione", "sanzioni", "mora"}),
@@ -55,6 +56,8 @@ def score(question_stems: set[str], fact: dict) -> float:
     inoltre almeno il 60% dei termini 'forti' della domanda deve comparire nel fatto, altrimenti è un'altra domanda
     (es. «budget marketing» non deve pescare il budget assunzioni)."""
     fstems = set(stems(fact["statement"])) | set(stems(" ".join(fact["topics"])))
+    if fact.get("context"):               # fatti da email in ingresso: conta anche chi scrive e di cosa (oggetto + testo)
+        fstems |= set(stems(fact["context"]))
     hit = question_stems & fstems
     # un numero identificativo nella domanda (es. «fattura 4521») deve comparire nel fatto: altrimenti è un'altra cosa
     q_ids = {q for q in question_stems if q.isdigit() and len(q) >= 3 and not re.fullmatch(r"(19|20)\d\d", q)}

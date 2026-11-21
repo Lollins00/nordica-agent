@@ -280,3 +280,17 @@ def test_calendar_add_event_from_ui_and_privacy():
     assert r.status_code == 200
     assert any(e["title"] == "Call banca" for e in as_("giulia").get("/api/calendar").json())
     assert not any(e["title"] == "Call banca" for e in as_("marco").get("/api/calendar").json())
+
+
+def test_inbox_approved_facts_answer_questions_about_the_sender():
+    """Regressione: un fatto approvato da un'email esterna deve rispondere anche a «ho problemi con <mittente>?»."""
+    m = _send("Il portale non carica le spedizioni",
+              "Da stamattina il portale non carica le spedizioni e compare un errore di accesso al database. È urgente.\nPaolo Verdi, Logistica Verdi")
+    assert m["outcome"]["sector"] == "Tech"
+    for fid in m["outcome"]["fact_ids"]:
+        assert as_("marco").post(f"/api/facts/{fid}/status", json={"status": "approved"}).status_code == 200
+    for q in ["Ho problemi con Logistica Verdi?", "Ci sono problemi con il portale?", "Che errore c'è sul database?"]:
+        r = ask("marco", q)
+        assert r["kind"] == "answer" and r["citations"], q
+    assert ask("giulia", "Ho problemi con Logistica Verdi?")["kind"] == "unknown"       # Finance non vede la richiesta Tech
+    assert ask("marco", "Quanto costa la mensa di Logistica Verdi?")["kind"] == "unknown"
