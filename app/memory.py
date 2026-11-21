@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 
 from . import data, llm, store
-from .config import NOW
+from .config import now
 from .permissions import acl_label, can_see
 from .util import norm
 
@@ -59,7 +59,7 @@ def set_status(fid: str, status: str, role: str, who: str) -> dict:
     f = get_fact(fid)
     if not f or not can_see(role, f["acl"]):
         raise LookupError("fatto non trovato")      # stessa risposta se non esiste o non è visibile
-    store.get()["facts"][fid] = {"status": status, "decided_by": who, "decided_at": NOW.isoformat(timespec="minutes")}
+    store.get()["facts"][fid] = {"status": status, "decided_by": who, "decided_at": now().isoformat(timespec="minutes")}
     store.get()["brief_cache"].clear()
     store.save()
     return get_fact(fid)

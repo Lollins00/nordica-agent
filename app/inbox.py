@@ -19,7 +19,7 @@ import time
 from email.header import decode_header, make_header
 
 from . import actions, data, llm, memory, qa, store
-from .config import NOW
+from .config import now
 from .util import numbers_in
 
 SECTORS = {"finance": "Finance", "tech": "Tech", "ceo": "CEO"}
@@ -78,7 +78,7 @@ def ingest(subject: str, body: str, via: str = "simulatore", from_addr: str = ""
     role = cls["sector"]
     owner = next(u for u in data.users() if u["role"] == role)
     src = {"id": store.next_id("IN"), "type": "email", "title": f"Email in ingresso · {subject or 'senza oggetto'}",
-           "date": NOW.isoformat(timespec="minutes"), "acl": [role], "text": body,
+           "date": now().isoformat(timespec="minutes"), "acl": [role], "text": body,
            "meta": {"from": from_addr or "mittente esterno", "who": from_addr, "via": via, "subject": subject}, "claims": []}
     st["extra_sources"].append(src)
     facts, _ = memory.extract_candidates(src)
@@ -88,7 +88,7 @@ def ingest(subject: str, body: str, via: str = "simulatore", from_addr: str = ""
     action = actions.propose_draft(role, "Company Brain", name, addr, subj, draft_body, via="email", reply_to=src["id"],
                                    writer="gemini" if llm.status()["mode"] == "gemini" else "fallback")
     msg = {"id": store.next_id("M"), "subject": subject, "body": body, "from": from_addr or "mittente esterno", "via": via,
-           "received_at": NOW.isoformat(timespec="minutes"), "source_id": src["id"], "routed_role": role,
+           "received_at": now().isoformat(timespec="minutes"), "source_id": src["id"], "routed_role": role,
            "outcome": {"type": "routed", "sector": SECTORS[role], "owner": owner["name"], "engine": cls["engine"],
                        "keywords": cls["keywords"], "summary": cls["summary"], "action_id": action["id"],
                        "fact_ids": [f["id"] for f in facts],

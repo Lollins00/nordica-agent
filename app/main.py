@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from . import actions, auth, brief, comms, data, events, inbox, llm, mailer, memory, qa, store
 from .auth import current_user
-from .config import NOW, STATIC_DIR
+from .config import STATIC_DIR, now
 from .permissions import acl_label, can_see
 
 app = FastAPI(title="Company Brain · Nordica")
@@ -51,7 +51,7 @@ def api_me(user: dict = Depends(current_user)):
 # ------------------------------------------------------------- generale
 @app.get("/api/status")
 def api_status(u: dict = Depends(current_user)):
-    return {"llm": llm.status(), "imap": inbox.imap_status(), "mail": mailer.status(), "now": NOW.isoformat(timespec="minutes"),
+    return {"llm": llm.status(), "imap": inbox.imap_status(), "mail": mailer.status(), "now": now().isoformat(timespec="minutes"),
             "badges": {"candidates": len(memory.facts_for(u["role"], "candidate")),
                        "pending": sum(1 for a in actions.visible_actions(u["role"]) if a["status"] == "pending" and u["role"] in a["approvers"]),
                        "requests": sum(1 for r in comms.visible_requests(u) if r["status"] == "pending" and u["role"] == "ceo")}}

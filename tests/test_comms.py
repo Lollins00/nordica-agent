@@ -104,7 +104,7 @@ def test_request_flags_policy_and_deadlines_by_itself():
     r = _ferie()
     texts = " ".join(c["text"] for c in r["checks"])
     assert r["status"] == "pending"
-    assert "Preavviso di 8 giorni" in texts and "15" in texts                       # policy ferie
+    assert "Preavviso di 10 giorni" in texts and "15" in texts                       # policy ferie
     assert "T-101" in texts                                                           # consegna di cui Marco è responsabile
     assert all(c["sources"] for c in r["checks"] if c["severity"] == "high")          # cita le fonti
 

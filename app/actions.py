@@ -3,7 +3,7 @@ effetto finché una persona abilitata non approva (comandamento 6)."""
 import re
 
 from . import data, events, llm, mailer, memory, qa, store
-from .config import NOW, TODAY
+from .config import now, today
 from .permissions import can_see
 from .util import fmt_date, fmt_dt, fmt_short, norm, numbers_in, parse_date, parse_time
 
@@ -30,7 +30,7 @@ def _create(kind: str, role: str, who: str, title: str, summary: str, details: l
     approvers = _approvers(kind, role)
     a = {"id": store.next_id("A"), "type": kind, "status": "pending", "title": title, "summary": summary,
          "details": details, "payload": payload, "proposed_by": who, "proposed_role": role, "via": via,
-         "approvers": approvers, "acl": _acl(role, approvers), "created_at": NOW.isoformat(timespec="minutes"),
+         "approvers": approvers, "acl": _acl(role, approvers), "created_at": now().isoformat(timespec="minutes"),
          "decided_by": None, "decided_at": None, "result": None}
     st["actions"].insert(0, a)
     store.save()
@@ -82,7 +82,7 @@ def _execute(a: dict) -> str:
         return f"Evento «{p['title']}» aggiunto al calendario."
     if a["type"] == "draft_email":
         if not mailer.configured():
-            st.setdefault("outbox", []).append({"to": p["to"], "subject": p["subject"], "body": p["body"], "at": NOW.isoformat(timespec="minutes")})
+            st.setdefault("outbox", []).append({"to": p["to"], "subject": p["subject"], "body": p["body"], "at": now().isoformat(timespec="minutes")})
             return "Bozza approvata e registrata come inviata (simulazione: SMTP non configurato)."
         res = mailer.send(p["to"], p["subject"], p["body"])          # solleva MailError se non parte
         a["sent"] = res
@@ -104,7 +104,7 @@ def decide(action_id: str, role: str, who: str, approve: bool) -> dict:
         raise ValueError("azione già decisa")
     if role not in a["approvers"]:
         raise PermissionError("il tuo ruolo non può decidere questa azione")
-    a["decided_by"], a["decided_at"] = who, NOW.isoformat(timespec="minutes")
+    a["decided_by"], a["decided_at"] = who, now().isoformat(timespec="minutes")
     if approve:
         try:
             a["result"] = _execute(a)
@@ -145,7 +145,7 @@ def edit_draft(action_id: str, role: str, who: str, to: str, subject: str, body:
         a["original"] = {"to": p["to"], "subject": p["subject"], "body": p["body"],
                          "writer": next((d["value"] for d in a["details"] if d["label"] == "Scritta da"), "")}
     p.update(to=to, subject=subject, body=body, to_name=p.get("to_name") or to)
-    a["edited_by"], a["edited_at"] = who, NOW.isoformat(timespec="minutes")
+    a["edited_by"], a["edited_at"] = who, now().isoformat(timespec="minutes")
     a["summary"] = f"Oggetto: {subject}"
     a["details"] = [{"label": "A", "value": f"{p['to_name']} <{to}>"}, {"label": "Oggetto", "value": subject},
                     {"label": "Testo", "value": body}, {"label": "Scritta da", "value": f"{a['original']['writer']} · modificata da {who}"}]
@@ -220,7 +220,7 @@ def propose_from_text(role: str, who: str, text: str, via: str = "chat") -> dict
         return None
     t = norm(text)
     if intent == "change_deadline":
-        new = parse_date(text, TODAY)
+        new = parse_date(text, today())
         ts = set(qa.stems(text))
         cands = [x for x in data.tasks() if can_see(role, x["acl"]) and x["status"] != "done"]
         def sc(x):
@@ -237,7 +237,7 @@ def propose_from_text(role: str, who: str, text: str, via: str = "chat") -> dict
             return {"kind": "clarify", "text": str(e).capitalize() + "."}
         return {"kind": "action", "action": a, "text": "Ho preparato la proposta di cambio scadenza. Resta IN ATTESA finché una persona abilitata non la approva."}
     if intent == "create_event":
-        d = parse_date(text, TODAY)
+        d = parse_date(text, today())
         if not d:
             return {"kind": "clarify", "text": "Per quando fisso l'evento? Indicami giorno e, se vuoi, l'ora."}
         hhmm = parse_time(text) or "10:00"

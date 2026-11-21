@@ -28,6 +28,12 @@ def load_env(path: Path = ROOT / ".env") -> None:
 
 load_env()
 
-# Orologio demo fisso: lunedì mattina, dopo una settimana di dati (16-20/11/2026)
-NOW = datetime.fromisoformat(os.getenv("DEMO_NOW", "2026-11-23T09:00:00"))
-TODAY = NOW.date()
+# Orologio: ora REALE del computer. Per rendere la demo ripetibile in un altro giorno si può fissarla
+# con DEMO_NOW nel .env (es. DEMO_NOW=2026-11-21T09:00:00). È una funzione: non resta ferma all'avvio.
+def now() -> datetime:
+    v = os.getenv("DEMO_NOW", "").strip()
+    return datetime.fromisoformat(v) if v else datetime.now().replace(microsecond=0)
+
+
+def today():
+    return now().date()

@@ -14,7 +14,7 @@ import threading
 from datetime import date, datetime, timedelta
 
 from . import data, memory, qa, store
-from .config import TODAY
+from .config import now, today
 from .permissions import ROLES, can_see
 from .util import fmt_date, fmt_short, to_date
 
@@ -23,8 +23,7 @@ WATCH_ASYNC = True            # i test lo mettono a False per rendere l'estrazio
 
 
 def stamp() -> str:
-    """Data della demo + ora reale: i messaggi live restano coerenti con il «lunedì 23/11» della demo."""
-    return f"{TODAY.isoformat()}T{datetime.now().strftime('%H:%M:%S')}"
+    return now().isoformat(timespec="seconds")
 
 
 def bump() -> int:
@@ -145,7 +144,7 @@ def create_request(user: dict, start: str, end: str, note: str = "") -> dict:
     s, e = _parse(start), _parse(end)
     if e < s:
         raise ValueError("la data di fine è precedente a quella di inizio")
-    if s < TODAY:
+    if s < today():
         raise ValueError("non si possono chiedere ferie nel passato")
     if (e - s).days > 30:
         raise ValueError("periodo troppo lungo (max 30 giorni)")
@@ -169,7 +168,7 @@ def checks(req: dict) -> list[dict]:
     s, e = to_date(req["start"]), to_date(req["end"])
     out = []
     srcs = data.all_sources()
-    notice = (s - TODAY).days
+    notice = (s - today()).days
     if notice < POLICY_NOTICE_DAYS:
         out.append({"severity": "high", "text": f"Preavviso di {notice} giorni: la policy chiede almeno {POLICY_NOTICE_DAYS} giorni.",
                     "sources": [data.source_ref(srcs["D-04"])] if "D-04" in srcs else []})

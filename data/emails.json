@@ -4,7 +4,7 @@
    "body": "Buongiorno Giulia, per esigenze di tesoreria vorremmo estendere il termine di pagamento dei prossimi SAL da 30 a 60 giorni. Potete darci un riscontro entro la settimana? Grazie, Luca Ferri",
    "claims": []},
   {"id": "E-02", "thread": "TH-2", "direction": "in", "external": true, "from_name": "Luca Ferri (Acme)", "from": "luca.ferri@acmelogistica.example", "to": ["marco"],
-   "subject": "Demo Release 2 mercoledì?", "date": "2026-11-20T17:05:00", "acl": ["tech"],
+   "subject": "Demo Release 2 mercoledì?", "date": "2026-11-19T17:05:00", "acl": ["tech"],
    "body": "Ciao Marco, riusciamo a vedere una demo della Release 2 mercoledì 25/11 nel pomeriggio? Ci servirebbe per allinearci con il nostro team operativo. Luca",
    "claims": []}
 ]

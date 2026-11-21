@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timedelta
 
 from . import data, llm, store
-from .config import NOW, TODAY
+from .config import now, today
 from .permissions import can_see
 from .util import day_label, fmt_date, fmt_short, numbers_in, to_date
 
@@ -38,11 +38,11 @@ def rule_deadlines(role: str) -> list[dict]:
         if t["status"] == "done" or not can_see(role, t["acl"]):
             continue
         due = to_date(t["due"])
-        days = (due - TODAY).days
-        if days > 7:
+        days = (due - today()).days
+        if days > 10:
             continue
         sev = "high" if days <= 2 else "med" if days <= 5 else "low"
-        when = "è SCADUTO" if days < 0 else f"scade il {fmt_short(due)} ({day_label(due, TODAY)})"
+        when = "è SCADUTO" if days < 0 else f"scade il {fmt_short(due)} ({day_label(due, today())})"
         out.append({"id": f"deadline:{t['id']}", "rule": "deadline", "severity": sev,
                     "title": f"Scadenza vicina: {t['title']}",
                     "detail": f"«{t['title']}» {when}. Responsabile: {t['owner_name']}.",
@@ -57,7 +57,7 @@ def rule_unanswered(role: str) -> list[dict]:
         if e["direction"] != "in" or not e.get("external") or e.get("needs_reply") is False or not can_see(role, e["acl"]):
             continue
         answered = any(o["thread"] == e["thread"] and o["direction"] == "out" and o["date"] > e["date"] for o in mails)
-        age = NOW - datetime.fromisoformat(e["date"])
+        age = now() - datetime.fromisoformat(e["date"])
         if answered or age < timedelta(hours=24):
             continue
         days = age.days
@@ -205,7 +205,7 @@ def build_brief(user: dict) -> dict:
                 if isinstance(i, str) and i.strip() and numbers_in(i) <= {str(len(alerts))}:
                     intro = i.strip()
     out = {"user": user["id"], "role": role, "first": first, "intro": intro, "writer": writer,
-           "generated_at": NOW.isoformat(timespec="minutes"),
+           "generated_at": now().isoformat(timespec="minutes"),
            "subject": f"Buongiorno {first}: {len(alerts)} cose da sapere oggi" if alerts else f"Buongiorno {first}: tutto in ordine",
            "alerts": [{**a, "text": texts[a["id"]]} for a in alerts]}
     if writer == "gemini":

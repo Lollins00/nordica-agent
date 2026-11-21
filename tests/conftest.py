@@ -24,6 +24,7 @@ def fake_mail(monkeypatch):
     monkeypatch.setenv("IMAP_PASSWORD", "x")
     monkeypatch.setenv("MAIL_REDIRECT_TO", "demo-owner@test.invalid")
     monkeypatch.delenv("MAIL_MODE", raising=False)
+    monkeypatch.setenv("DEMO_NOW", "2026-11-21T10:00:00")   # sabato 21/11: test ripetibili in qualunque giorno
     SENT.clear()
     mailer.TEST_SENT = SENT
     mailer._SENT.clear()
